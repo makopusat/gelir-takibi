@@ -104,34 +104,41 @@
             reportSection.style.display = reportSection.style.display === "none" ? "block" : "none";
         }
 
-        function showReport() {
+       function showReport() {
     let startDate = document.getElementById("startDate").value;
     let endDate = document.getElementById("endDate").value;
     let tbody = document.getElementById("transactions");
     tbody.innerHTML = "";
 
     try {
-        let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
-        
-        if (transactions.length === 0) {
+        let storedData = localStorage.getItem('transactions');
+        if (!storedData) {
             alert("Henüz kayıtlı veri yok!");
             return;
         }
 
-        transactions.forEach(t => {
-            if (t.date >= startDate && t.date <= endDate) {
-                let row = `<tr>
-                    <td>${t.date}</td>
-                    <td>${t.amount} TL</td>
-                    <td>${t.description}</td>
-                    <td>${t.type}</td>
-                </tr>`;
-                tbody.innerHTML += row;
-            }
+        let transactions = JSON.parse(storedData);
+        console.log("Yüklenen Veriler:", transactions); // Hata ayıklama için
+
+        let filteredTransactions = transactions.filter(t => t.date >= startDate && t.date <= endDate);
+
+        if (filteredTransactions.length === 0) {
+            tbody.innerHTML = "<tr><td colspan='4'>Seçilen tarihlerde kayıt bulunamadı</td></tr>";
+            return;
+        }
+
+        filteredTransactions.forEach(t => {
+            let row = `<tr>
+                <td>${t.date}</td>
+                <td>${t.amount} TL</td>
+                <td>${t.description}</td>
+                <td>${t.type}</td>
+            </tr>`;
+            tbody.innerHTML += row;
         });
 
-    catch (error) 
-       { console.error("localStorage okuma hatası:", error);
+    } catch (error) {
+        console.error("localStorage okuma hatası:", error);
         alert("Veri okunurken hata oluştu! Lütfen sayfayı yenileyin.");
     }
 }
