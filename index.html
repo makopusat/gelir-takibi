@@ -72,27 +72,34 @@
             }
         }
 
-        function addTransaction(isIncome) {
-            let amountInput = document.getElementById("amount");
-            let descriptionInput = document.getElementById("description");
-            let amount = amountInput.value;
-            let description = descriptionInput.value;
-            if (!amount) return alert("Lütfen tutar girin");
-            
-            let transaction = {
-                date: new Date().toISOString().split('T')[0],
-                amount: parseFloat(amount),
-                description: description,
-                type: isIncome ? "Gelir" : "Gider"
-            };
-            transactions.push(transaction);
-            localStorage.setItem('transactions', JSON.stringify(transactions));
-            
-            amountInput.value = "";
-            descriptionInput.value = "";
-            
-            updateUI();
-        }
+       function addTransaction(isIncome) {
+    let amountInput = document.getElementById("amount");
+    let descriptionInput = document.getElementById("description");
+    let amount = amountInput.value.trim();
+    let description = descriptionInput.value.trim();
+
+    if (!amount) return alert("Lütfen tutar girin");
+
+    let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+
+    let transaction = {
+        date: new Date().toISOString().split('T')[0], 
+        amount: parseFloat(amount), 
+        description: description, 
+        type: isIncome ? "Gelir" : "Gider"
+    };
+
+    transactions.push(transaction);
+    localStorage.setItem('transactions', JSON.stringify(transactions));
+
+    console.log("Kaydedilen Veriler:", transactions); // Hata ayıklama için
+    alert("Kayıt başarılı!");
+
+    amountInput.value = "";
+    descriptionInput.value = "";
+
+    updateUI();
+}
 
         function updateUI() {
             let totalProfit = transactions.reduce((sum, t) => sum + (t.type === "Gelir" ? t.amount : -t.amount), 0);
