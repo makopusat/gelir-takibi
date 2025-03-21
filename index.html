@@ -4,12 +4,93 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Banka ve Gelir-Gider Raporu</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 18px; /* Genel yazı boyutunu büyütüyoruz */
+            margin: 20px;
+        }
+
+        h2, h3, h4 {
+            font-size: 24px; /* Başlıkların yazı boyutunu büyütüyoruz */
+            text-align: center;
+        }
+
+        label, button, select, input {
+            font-size: 18px; /* Tüm form elemanlarının yazı boyutunu büyütüyoruz */
+            margin: 10px 0;
+            padding: 10px;
+        }
+
+        input[type="number"], input[type="text"], input[type="date"], select {
+            width: 100%;
+            font-size: 18px;
+            padding: 10px;
+            margin-top: 5px;
+        }
+
+        /* İşlem Geçmişi ve Rapor Liste düzeni */
+        ul {
+            list-style-type: none;
+            padding: 0;
+            font-size: 18px;
+        }
+
+        li {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        button {
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 15px 20px;
+            font-size: 20px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        /* Form elemanlarının hizalanması */
+        div, select, input {
+            display: block;
+            width: 100%;
+        }
+
+        /* Ekranı daha düzenli hale getirmek için düzenleme */
+        #appSection {
+            width: 80%;
+            margin: 0 auto;
+        }
+
+        /* Rapor filtreleme bölümünü daha belirgin yapmak için */
+        #filterSection {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f4f4f4;
+            border-radius: 5px;
+            display: none;
+        }
+
+        /* Rapor sonuçlarını göstermek için */
+        #reportSection {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            display: none;
+        }
+    </style>
 </head>
 <body>
 
 <h2>Banka ve Gelir-Gider Raporu</h2>
 
-<!-- Kullanıcı Giriş ve Kayıt -->
+<!-- Kullanıcı Girişi -->
 <div id="loginSection">
     <h3>Kullanıcı Girişi</h3>
     <label for="loginUsername">Kullanıcı Adı:</label>
@@ -21,13 +102,13 @@
     <button onclick="forgotPassword()">Şifre Unuttum</button>
 </div>
 
-<!-- Ana işlem ekranı, başlangıçta gizli -->
+<!-- Ana uygulama kısmı, başlangıçta gizli -->
 <div id="appSection" style="display: none;">
     <!-- Banka Seçimi ve Banka Ekleme -->
     <div id="bankSection">
         <label for="bank">Banka Seçin:</label>
         <select id="bank">
-            <!-- Başlangıçta eklenen bankalar buraya eklenecek -->
+            <!-- Dinamik olarak eklenen bankalar buraya eklenecek -->
         </select>
         <button onclick="addBank()">Banka Ekle</button>
         <input type="text" id="newBankName" placeholder="Yeni banka adı" style="display: none;">
@@ -56,25 +137,7 @@
 
     <!-- Rapor Görüntüle Butonu -->
     <h3>Rapor Görüntüle</h3>
-    <label for="startDate">Başlangıç Tarihi:</label>
-    <input type="date" id="startDate">
-    <label for="endDate">Bitiş Tarihi:</label>
-    <input type="date" id="endDate">
-
-    <label for="incomeExpenseFilter">Gelir/Gider Seçimi:</label>
-    <select id="incomeExpenseFilter">
-        <option value="">Hepsi</option>
-        <option value="Gelir">Gelir</option>
-        <option value="Gider">Gider</option>
-    </select>
-
-    <label for="bankFilter">Banka Seçimi:</label>
-    <select id="bankFilter">
-        <option value="">Hepsi</option>
-        <!-- Dinamik olarak banka seçenekleri eklenecek -->
-    </select>
-
-    <button onclick="generateReport()">Raporu Göster</button>
+    <button onclick="showReportFilters()">Raporu Göster</button>
 
     <!-- Çıkış Yap Butonu -->
     <button onclick="logout()">Çıkış Yap</button>
@@ -83,6 +146,29 @@
         <h3>Rapor Sonuçları:</h3>
         <ul id="reportList"></ul>
         <h4>Toplam Gelir/Gider: <span id="reportTotal"></span></h4>
+    </div>
+
+    <!-- Tarih ve banka filtresi sadece rapor görüntüleme butonuna basınca görünür -->
+    <div id="filterSection" style="display: none;">
+        <label for="startDate">Başlangıç Tarihi:</label>
+        <input type="date" id="startDate">
+        <label for="endDate">Bitiş Tarihi:</label>
+        <input type="date" id="endDate">
+
+        <label for="incomeExpenseFilter">Gelir/Gider Seçimi:</label>
+        <select id="incomeExpenseFilter">
+            <option value="">Hepsi</option>
+            <option value="Gelir">Gelir</option>
+            <option value="Gider">Gider</option>
+        </select>
+
+        <label for="bankFilter">Banka Seçimi:</label>
+        <select id="bankFilter">
+            <option value="">Hepsi</option>
+            <!-- Dinamik olarak banka seçenekleri eklenecek -->
+        </select>
+
+        <button onclick="generateReport()">Raporu Göster</button>
     </div>
 </div>
 
@@ -233,55 +319,35 @@
             reportList.appendChild(listItem);
         });
 
-        document.getElementById("reportTotal").textContent = `${total} TL`;
+        document.getElementById("reportTotal").textContent = total;
 
-        document.getElementById("reportSection").style.display = "block";  // Raporu göster
+        document.getElementById("reportSection").style.display = "block";
     }
 
-    // Banka listesi sayfa yüklenince yükleniyor
-    function loadBanks() {
-        let bankSelect = document.getElementById("bank");
-        let bankFilter = document.getElementById("bankFilter");
-
-        bankSelect.innerHTML = "";
-        bankFilter.innerHTML = "";
-
-        banks.forEach(bank => {
-            let newOption = document.createElement("option");
-            newOption.value = bank;
-            newOption.textContent = bank;
-            bankSelect.appendChild(newOption);
-
-            let filterOption = document.createElement("option");
-            filterOption.value = bank;
-            filterOption.textContent = bank;
-            bankFilter.appendChild(filterOption);
-        });
+    function showReportFilters() {
+        document.getElementById("filterSection").style.display = "block";
     }
 
-    // Kullanıcı giriş yaptıktan sonra bölümleri göster
-    function toggleSections() {
-        document.getElementById('loginSection').style.display = 'none';
-        document.getElementById('appSection').style.display = 'block';
-        loadBanks();
-        updateUI();
-    }
-
-    // Çıkış yap
     function logout() {
-        currentUser = null; // Çıkış yaptıktan sonra currentUser'ı sıfırlıyoruz
-        document.getElementById('loginSection').style.display = 'block';
-        document.getElementById('appSection').style.display = 'none';
-        alert("Çıkış yapıldı! Tekrar aynı kullanıcı adı ve şifre ile giriş yapabilirsiniz.");
+        currentUser = null;
+        localStorage.removeItem('currentUser');
+        toggleSections();
+        alert("Çıkış yapıldı.");
     }
 
-    // Sayfa ilk yüklendiğinde mevcut kullanıcıyı kontrol et
-    window.onload = function() {
-        if (localStorage.getItem('currentUser')) {
-            currentUser = JSON.parse(localStorage.getItem('currentUser'));
-            toggleSections();
+    function toggleSections() {
+        if (currentUser) {
+            document.getElementById("loginSection").style.display = "none";
+            document.getElementById("appSection").style.display = "block";
+            updateUI();
+        } else {
+            document.getElementById("loginSection").style.display = "block";
+            document.getElementById("appSection").style.display = "none";
         }
     }
+
+    // Başlangıçta kullanıcı girişi yapılmamışsa giriş kısmını göster
+    toggleSections();
 </script>
 
 </body>
