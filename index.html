@@ -131,10 +131,6 @@
 
     <h3>Toplam Kar: <span id="totalProfit">0</span></h3>
 
-    <!-- Geçmiş işlemler -->
-    <h3>İşlem Geçmişi:</h3>
-    <ul id="transactionList"></ul>
-
     <!-- Rapor Görüntüle Butonu -->
     <h3>Rapor Görüntüle</h3>
     <button onclick="showReportFilters()">Raporu Göster</button>
@@ -146,6 +142,7 @@
         <h3>Rapor Sonuçları:</h3>
         <ul id="reportList"></ul>
         <h4>Toplam Gelir/Gider: <span id="reportTotal"></span></h4>
+        <h4>Kar/Zarar Oranı: <span id="profitLossPercentage"></span></h4>
     </div>
 
     <!-- Tarih ve banka filtresi sadece rapor görüntüleme butonuna basınca görünür -->
@@ -251,15 +248,6 @@
     function updateUI() {
         let totalProfit = transactions.reduce((sum, t) => sum + (t.type === "Gelir" ? t.amount : -t.amount), 0);
         document.getElementById("totalProfit").textContent = totalProfit;
-
-        let transactionList = document.getElementById("transactionList");
-        transactionList.innerHTML = "";
-
-        transactions.forEach(t => {
-            let listItem = document.createElement("li");
-            listItem.textContent = `${t.date} - ${t.type}: ${t.amount} TL - Banka: ${t.bank} - Açıklama: ${t.description}`;
-            transactionList.appendChild(listItem);
-        });
     }
 
     // İşlem ekleme
@@ -308,42 +296,35 @@
             return withinDateRange && matchIncomeExpense && matchBank;
         });
 
+        // Raporu ekrana yazdır
         let reportList = document.getElementById("reportList");
-        reportList.innerHTML = "";  // Önceki raporu temizle
-
-        let total = filteredTransactions.reduce((sum, t) => sum + (t.type === "Gelir" ? t.amount : -t.amount), 0);
+        reportList.innerHTML = "";
         
+        let total = filteredTransactions.reduce((sum, t) => sum + (t.type === "Gelir" ? t.amount : -t.amount), 0);
         filteredTransactions.forEach(t => {
             let listItem = document.createElement("li");
             listItem.textContent = `${t.date} - ${t.type}: ${t.amount} TL - Banka: ${t.bank} - Açıklama: ${t.description}`;
             reportList.appendChild(listItem);
         });
 
-        document.getElementById("reportTotal").textContent = total;
+        let profitLossPercentage = (total > 0 ? (total / (total - Math.abs(total))) * 100 : 0).toFixed(2);
+        document.getElementById("reportTotal").textContent = total + " TL";
+        document.getElementById("profitLossPercentage").textContent = profitLossPercentage + "%";
 
         document.getElementById("reportSection").style.display = "block";
     }
 
+    // Rapor filtrelerini göster
     function showReportFilters() {
         document.getElementById("filterSection").style.display = "block";
     }
 
+    // Çıkış işlemi
     function logout() {
         currentUser = null;
         localStorage.removeItem('currentUser');
         toggleSections();
         alert("Çıkış yapıldı.");
-    }
-
-    function toggleSections() {
-        if (currentUser) {
-            document.getElementById("loginSection").style.display = "none";
-            document.getElementById("appSection").style.display = "block";
-            updateUI();
-        } else {
-            document.getElementById("loginSection").style.display = "block";
-            document.getElementById("appSection").style.display = "none";
-        }
     }
 
     // Başlangıçta kullanıcı girişi yapılmamışsa giriş kısmını göster
