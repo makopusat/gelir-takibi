@@ -55,10 +55,35 @@
     <ul id="transactionList"></ul>
 
     <!-- Rapor Görüntüle Butonu -->
-    <button onclick="viewReport()">Rapor Görüntüle</button>
+    <h3>Rapor Görüntüle</h3>
+    <label for="startDate">Başlangıç Tarihi:</label>
+    <input type="date" id="startDate">
+    <label for="endDate">Bitiş Tarihi:</label>
+    <input type="date" id="endDate">
+
+    <label for="incomeExpenseFilter">Gelir/Gider Seçimi:</label>
+    <select id="incomeExpenseFilter">
+        <option value="">Hepsi</option>
+        <option value="Gelir">Gelir</option>
+        <option value="Gider">Gider</option>
+    </select>
+
+    <label for="bankFilter">Banka Seçimi:</label>
+    <select id="bankFilter">
+        <option value="">Hepsi</option>
+        <!-- Dinamik olarak banka seçenekleri eklenecek -->
+    </select>
+
+    <button onclick="generateReport()">Raporu Göster</button>
 
     <!-- Çıkış Yap Butonu -->
     <button onclick="logout()">Çıkış Yap</button>
+
+    <div id="reportSection" style="display: none;">
+        <h3>Rapor Sonuçları:</h3>
+        <ul id="reportList"></ul>
+        <h4>Toplam Gelir/Gider: <span id="reportTotal"></span></h4>
+    </div>
 </div>
 
 <script>
@@ -181,21 +206,56 @@
         alert("İşlem başarıyla kaydedildi!");
     }
 
-    // Rapor Görüntüleme
-    function viewReport() {
-        alert("Rapor Görüntüleniyor...");
-        // Burada raporun detaylı şekilde gösterilmesini sağlayabilirsiniz
+    // Raporu göster
+    function generateReport() {
+        let startDate = document.getElementById("startDate").value;
+        let endDate = document.getElementById("endDate").value;
+        let incomeExpenseFilter = document.getElementById("incomeExpenseFilter").value;
+        let bankFilter = document.getElementById("bankFilter").value;
+
+        let filteredTransactions = transactions.filter(t => {
+            let transactionDate = t.date;
+            let withinDateRange = (startDate === "" || transactionDate >= startDate) && (endDate === "" || transactionDate <= endDate);
+            let matchIncomeExpense = incomeExpenseFilter === "" || t.type === incomeExpenseFilter;
+            let matchBank = bankFilter === "" || t.bank === bankFilter;
+
+            return withinDateRange && matchIncomeExpense && matchBank;
+        });
+
+        let reportList = document.getElementById("reportList");
+        reportList.innerHTML = "";  // Önceki raporu temizle
+
+        let total = filteredTransactions.reduce((sum, t) => sum + (t.type === "Gelir" ? t.amount : -t.amount), 0);
+        
+        filteredTransactions.forEach(t => {
+            let listItem = document.createElement("li");
+            listItem.textContent = `${t.date} - ${t.type}: ${t.amount} TL - Banka: ${t.bank} - Açıklama: ${t.description}`;
+            reportList.appendChild(listItem);
+        });
+
+        document.getElementById("reportTotal").textContent = `${total} TL`;
+
+        document.getElementById("reportSection").style.display = "block";  // Raporu göster
     }
 
     // Banka listesi sayfa yüklenince yükleniyor
     function loadBanks() {
         let bankSelect = document.getElementById("bank");
+        let bankFilter = document.getElementById("bankFilter");
+
         bankSelect.innerHTML = "";
+        bankFilter.innerHTML = "";
+
         banks.forEach(bank => {
             let newOption = document.createElement("option");
             newOption.value = bank;
             newOption.textContent = bank;
             bankSelect.appendChild(newOption);
+
+            let filterOption = document.createElement("option");
+            filterOption.value = bank;
+            filterOption.textContent = bank;
+            bankFilter.appendChild(filterOption);
         });
     }
 
