@@ -7,53 +7,85 @@
 </head>
 <body>
 
-<h2>Gelir ve Gider Ekle</h2>
+<h2>Banka ve Gelir-Gider Raporu</h2>
 
 <!-- Kullanıcı Giriş ve Kayıt -->
-<div id="userSection">
-    <button id="registerButton">Üye Ol</button>
-    <button id="forgotPasswordButton">Şifre Unuttum</button>
+<div id="loginSection">
+    <h3>Kullanıcı Girişi</h3>
+    <label for="loginUsername">Kullanıcı Adı:</label>
+    <input type="text" id="loginUsername" placeholder="Kullanıcı adı girin">
+    <label for="loginPassword">Şifre:</label>
+    <input type="password" id="loginPassword" placeholder="Şifre girin">
+    <button onclick="login()">Giriş Yap</button>
+    <button onclick="registerUser()">Üye Ol</button>
+    <button onclick="forgotPassword()">Şifre Unuttum</button>
 </div>
 
-<!-- Banka Seçimi ve Banka Ekleme -->
-<div id="bankSection">
-    <label for="bank">Banka Seçin:</label>
-    <select id="bank">
-        <!-- Başlangıçta eklenen bankalar buraya eklenecek -->
-    </select>
-    <button onclick="addBank()">Banka Ekle</button>
-    <input type="text" id="newBankName" placeholder="Yeni banka adı" style="display: none;">
+<!-- Ana işlem ekranı, başlangıçta gizli -->
+<div id="appSection" style="display: none;">
+    <!-- Banka Seçimi ve Banka Ekleme -->
+    <div id="bankSection">
+        <label for="bank">Banka Seçin:</label>
+        <select id="bank">
+            <!-- Başlangıçta eklenen bankalar buraya eklenecek -->
+        </select>
+        <button onclick="addBank()">Banka Ekle</button>
+        <input type="text" id="newBankName" placeholder="Yeni banka adı" style="display: none;">
+    </div>
+
+    <!-- Miktar ve Açıklama -->
+    <div>
+        <label for="amount">Tutar:</label>
+        <input type="number" id="amount" placeholder="Tutar girin">
+    </div>
+
+    <div>
+        <label for="description">Açıklama:</label>
+        <input type="text" id="description" placeholder="Açıklama girin">
+    </div>
+
+    <!-- Gelir / Gider Seçimi -->
+    <button onclick="addTransaction(true)">Gelir Ekle</button>
+    <button onclick="addTransaction(false)">Gider Ekle</button>
+
+    <h3>Toplam Kar: <span id="totalProfit">0</span></h3>
+
+    <!-- Geçmiş işlemler -->
+    <h3>İşlem Geçmişi:</h3>
+    <ul id="transactionList"></ul>
+
+    <!-- Rapor Görüntüle Butonu -->
+    <button onclick="viewReport()">Rapor Görüntüle</button>
+
+    <!-- Çıkış Yap Butonu -->
+    <button onclick="logout()">Çıkış Yap</button>
 </div>
-
-<!-- Miktar ve Açıklama -->
-<div>
-    <label for="amount">Tutar:</label>
-    <input type="number" id="amount" placeholder="Tutar girin">
-</div>
-
-<div>
-    <label for="description">Açıklama:</label>
-    <input type="text" id="description" placeholder="Açıklama girin">
-</div>
-
-<!-- Gelir / Gider Seçimi -->
-<button onclick="addTransaction(true)">Gelir Ekle</button>
-<button onclick="addTransaction(false)">Gider Ekle</button>
-
-<h3>Toplam Kar: <span id="totalProfit">0</span></h3>
-
-<!-- Geçmiş işlemler -->
-<h3>İşlem Geçmişi:</h3>
-<ul id="transactionList"></ul>
 
 <script>
     let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
     let users = JSON.parse(localStorage.getItem('users')) || [];
-    let banks = JSON.parse(localStorage.getItem('banks')) || []; // Bankalar burada saklanacak
-    let currentUser = null;
+    let banks = JSON.parse(localStorage.getItem('banks')) || [];
+    let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
 
-    // Kullanıcı girişi ve kayıt işlemleri
-    document.getElementById('registerButton').addEventListener('click', () => {
+    // Kullanıcı girişi işlemi
+    function login() {
+        let username = document.getElementById('loginUsername').value.trim();
+        let password = document.getElementById('loginPassword').value.trim();
+        
+        let user = users.find(u => u.username === username && u.password === password);
+        
+        if (user) {
+            currentUser = user;
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));  // Giriş yapan kullanıcıyı kaydediyoruz
+            alert("Başarıyla giriş yaptınız!");
+            toggleSections();
+        } else {
+            alert("Kullanıcı adı veya şifre hatalı.");
+        }
+    }
+
+    // Üye olma işlemi
+    function registerUser() {
         let username = prompt("Kullanıcı Adı:");
         let password = prompt("Şifre:");
         
@@ -62,11 +94,12 @@
         } else {
             users.push({ username, password });
             localStorage.setItem('users', JSON.stringify(users));
-            alert("Kayıt başarılı!");
+            alert("Kayıt başarılı! Giriş yapabilirsiniz.");
         }
-    });
+    }
 
-    document.getElementById('forgotPasswordButton').addEventListener('click', () => {
+    // Şifre sıfırlama işlemi
+    function forgotPassword() {
         let username = prompt("Kullanıcı Adınızı Girin:");
         let user = users.find(u => u.username === username);
         
@@ -78,7 +111,7 @@
         } else {
             alert("Kullanıcı bulunamadı.");
         }
-    });
+    }
 
     // Banka ekleme
     function addBank() {
@@ -90,18 +123,14 @@
         } else {
             let newBankName = newBankNameInput.value.trim();
             if (newBankName) {
-                // Bankayı bankalar listesine ekle
                 banks.push(newBankName);
                 localStorage.setItem('banks', JSON.stringify(banks));
-
-                // Bankayı banka seçimi listesindeki <select> öğesine ekle
                 let bankSelect = document.getElementById("bank");
                 let newOption = document.createElement("option");
                 newOption.value = newBankName;
                 newOption.textContent = newBankName;
                 bankSelect.appendChild(newOption);
-
-                newBankNameInput.value = "";  // Banka adını temizle
+                newBankNameInput.value = "";
                 alert("Yeni banka eklendi!");
             }
         }
@@ -109,11 +138,9 @@
 
     // UI'yi güncelle
     function updateUI() {
-        // Gelir ve gideri toplayarak karı hesapla
         let totalProfit = transactions.reduce((sum, t) => sum + (t.type === "Gelir" ? t.amount : -t.amount), 0);
         document.getElementById("totalProfit").textContent = totalProfit;
 
-        // İşlem geçmişini göster
         let transactionList = document.getElementById("transactionList");
         transactionList.innerHTML = "";
 
@@ -154,12 +181,16 @@
         alert("İşlem başarıyla kaydedildi!");
     }
 
-    // Sayfa yüklendiğinde UI'yi güncelle
+    // Rapor Görüntüleme
+    function viewReport() {
+        alert("Rapor Görüntüleniyor...");
+        // Burada raporun detaylı şekilde gösterilmesini sağlayabilirsiniz
+    }
+
+    // Banka listesi sayfa yüklenince yükleniyor
     function loadBanks() {
         let bankSelect = document.getElementById("bank");
-        bankSelect.innerHTML = ""; // Seçenekleri temizle
-
-        // LocalStorage'dan eklenen bankaları al ve listede göster
+        bankSelect.innerHTML = "";
         banks.forEach(bank => {
             let newOption = document.createElement("option");
             newOption.value = bank;
@@ -168,9 +199,29 @@
         });
     }
 
-    // Sayfa yüklendiğinde bankaları yükle
-    loadBanks();
-    updateUI();
+    // Kullanıcı giriş yaptıktan sonra bölümleri göster
+    function toggleSections() {
+        document.getElementById('loginSection').style.display = 'none';
+        document.getElementById('appSection').style.display = 'block';
+        loadBanks();
+        updateUI();
+    }
+
+    // Çıkış yap
+    function logout() {
+        currentUser = null; // Çıkış yaptıktan sonra currentUser'ı sıfırlıyoruz
+        document.getElementById('loginSection').style.display = 'block';
+        document.getElementById('appSection').style.display = 'none';
+        alert("Çıkış yapıldı! Tekrar aynı kullanıcı adı ve şifre ile giriş yapabilirsiniz.");
+    }
+
+    // Sayfa ilk yüklendiğinde mevcut kullanıcıyı kontrol et
+    window.onload = function() {
+        if (localStorage.getItem('currentUser')) {
+            currentUser = JSON.parse(localStorage.getItem('currentUser'));
+            toggleSections();
+        }
+    }
 </script>
 
 </body>
