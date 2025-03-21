@@ -9,13 +9,21 @@
 
 <h2>Gelir ve Gider Ekle</h2>
 
-<!-- Banka Seçimi -->
-<label for="bank">Banka Seçin:</label>
-<select id="bank">
-    <option value="Banka1">Banka 1</option>
-    <option value="Banka2">Banka 2</option>
-    <option value="Banka3">Banka 3</option>
-</select>
+<!-- Kullanıcı Giriş ve Kayıt -->
+<div id="userSection">
+    <button id="registerButton">Üye Ol</button>
+    <button id="forgotPasswordButton">Şifre Unuttum</button>
+</div>
+
+<!-- Banka Seçimi ve Banka Ekleme -->
+<div id="bankSection">
+    <label for="bank">Banka Seçin:</label>
+    <select id="bank">
+        <!-- Başlangıçta eklenen bankalar buraya eklenecek -->
+    </select>
+    <button onclick="addBank()">Banka Ekle</button>
+    <input type="text" id="newBankName" placeholder="Yeni banka adı" style="display: none;">
+</div>
 
 <!-- Miktar ve Açıklama -->
 <div>
@@ -39,8 +47,65 @@
 <ul id="transactionList"></ul>
 
 <script>
-    // Geçmiş işlemleri almak için
     let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+    let users = JSON.parse(localStorage.getItem('users')) || [];
+    let banks = JSON.parse(localStorage.getItem('banks')) || []; // Bankalar burada saklanacak
+    let currentUser = null;
+
+    // Kullanıcı girişi ve kayıt işlemleri
+    document.getElementById('registerButton').addEventListener('click', () => {
+        let username = prompt("Kullanıcı Adı:");
+        let password = prompt("Şifre:");
+        
+        if (users.some(user => user.username === username)) {
+            alert("Bu kullanıcı adı zaten mevcut.");
+        } else {
+            users.push({ username, password });
+            localStorage.setItem('users', JSON.stringify(users));
+            alert("Kayıt başarılı!");
+        }
+    });
+
+    document.getElementById('forgotPasswordButton').addEventListener('click', () => {
+        let username = prompt("Kullanıcı Adınızı Girin:");
+        let user = users.find(u => u.username === username);
+        
+        if (user) {
+            let newPassword = prompt("Yeni şifrenizi girin:");
+            user.password = newPassword;
+            localStorage.setItem('users', JSON.stringify(users));
+            alert("Şifreniz başarıyla güncellendi!");
+        } else {
+            alert("Kullanıcı bulunamadı.");
+        }
+    });
+
+    // Banka ekleme
+    function addBank() {
+        let newBankNameInput = document.getElementById("newBankName");
+        newBankNameInput.style.display = newBankNameInput.style.display === "none" ? "block" : "none";
+        
+        if (newBankNameInput.style.display === "block") {
+            newBankNameInput.focus();
+        } else {
+            let newBankName = newBankNameInput.value.trim();
+            if (newBankName) {
+                // Bankayı bankalar listesine ekle
+                banks.push(newBankName);
+                localStorage.setItem('banks', JSON.stringify(banks));
+
+                // Bankayı banka seçimi listesindeki <select> öğesine ekle
+                let bankSelect = document.getElementById("bank");
+                let newOption = document.createElement("option");
+                newOption.value = newBankName;
+                newOption.textContent = newBankName;
+                bankSelect.appendChild(newOption);
+
+                newBankNameInput.value = "";  // Banka adını temizle
+                alert("Yeni banka eklendi!");
+            }
+        }
+    }
 
     // UI'yi güncelle
     function updateUI() {
@@ -50,7 +115,7 @@
 
         // İşlem geçmişini göster
         let transactionList = document.getElementById("transactionList");
-        transactionList.innerHTML = ""; // Listeyi temizle
+        transactionList.innerHTML = "";
 
         transactions.forEach(t => {
             let listItem = document.createElement("li");
@@ -59,7 +124,7 @@
         });
     }
 
-    // İşlem ekleme fonksiyonu
+    // İşlem ekleme
     function addTransaction(isIncome) {
         let amountInput = document.getElementById("amount");
         let descriptionInput = document.getElementById("description");
@@ -82,7 +147,6 @@
         transactions.push(transaction);
         localStorage.setItem('transactions', JSON.stringify(transactions));
 
-        // Formu sıfırlama
         amountInput.value = "";
         descriptionInput.value = "";
 
@@ -91,6 +155,21 @@
     }
 
     // Sayfa yüklendiğinde UI'yi güncelle
+    function loadBanks() {
+        let bankSelect = document.getElementById("bank");
+        bankSelect.innerHTML = ""; // Seçenekleri temizle
+
+        // LocalStorage'dan eklenen bankaları al ve listede göster
+        banks.forEach(bank => {
+            let newOption = document.createElement("option");
+            newOption.value = bank;
+            newOption.textContent = bank;
+            bankSelect.appendChild(newOption);
+        });
+    }
+
+    // Sayfa yüklendiğinde bankaları yükle
+    loadBanks();
     updateUI();
 </script>
 
