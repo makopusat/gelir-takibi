@@ -74,7 +74,6 @@
             border-radius: 5px;
             display: none;
         }
-
     </style>
 </head>
 <body>
@@ -296,6 +295,63 @@
             newOption.textContent = bank;
             bankSelect.appendChild(newOption);
         });
+    }
+
+    // Raporu filtreleme ve gösterme
+    function showReportFilters() {
+        document.getElementById("filterSection").style.display = "block";
+        document.getElementById("reportSection").style.display = "none";  // Raporu gizle
+    }
+
+    // Tarih aralığına göre rapor üretme
+    function generateReport() {
+        let startDate = document.getElementById("startDate").value;
+        let endDate = document.getElementById("endDate").value;
+        let incomeExpenseFilter = document.getElementById("incomeExpenseFilter").value;
+        let bankFilter = document.getElementById("bankFilter").value;
+
+        if (!startDate || !endDate) {
+            alert("Başlangıç ve bitiş tarihlerini girin.");
+            return;
+        }
+
+        // Tarih aralığını Date objesine dönüştür
+        let start = new Date(startDate);
+        let end = new Date(endDate);
+
+        // Filtrelenmiş işlemleri al
+        let filteredTransactions = transactions.filter(t => {
+            let transactionDate = new Date(t.date);
+            let isInDateRange = transactionDate >= start && transactionDate <= end;
+            let matchesIncomeExpense = !incomeExpenseFilter || t.type === incomeExpenseFilter;
+            let matchesBank = !bankFilter || t.bank === bankFilter;
+
+            return isInDateRange && matchesIncomeExpense && matchesBank;
+        });
+
+        // Raporu oluştur
+        let reportList = document.getElementById("reportList");
+        reportList.innerHTML = "";
+
+        filteredTransactions.forEach(t => {
+            let listItem = document.createElement("li");
+            listItem.textContent = `${t.date} - ${t.type}: ${t.amount} TL - Banka: ${t.bank} - Açıklama: ${t.description}`;
+            reportList.appendChild(listItem);
+        });
+
+        // Toplam geliri ve gideri hesapla
+        let totalIncome = filteredTransactions.filter(t => t.type === "Gelir").reduce((sum, t) => sum + t.amount, 0);
+        let totalExpense = filteredTransactions.filter(t => t.type === "Gider").reduce((sum, t) => sum + t.amount, 0);
+
+        let total = totalIncome - totalExpense;
+        let profitLoss = (totalIncome !== 0 || totalExpense !== 0) ? (total / totalIncome * 100) : 0;
+
+        // Sonuçları ekle
+        document.getElementById("reportTotal").textContent = `${totalIncome} TL Gelir, ${totalExpense} TL Gider, Toplam: ${total} TL`;
+        document.getElementById("profitLossPercentage").textContent = `${profitLoss.toFixed(2)}%`;
+
+        document.getElementById("filterSection").style.display = "none"; // Filtreyi gizle
+        document.getElementById("reportSection").style.display = "block"; // Raporu göster
     }
 
     // Sayfa yüklendiğinde UI'yi kontrol et
