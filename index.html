@@ -2,12 +2,73 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
-  <title>Gelir Gider Uygulaması</title>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, addDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  <title>Gelir/Gider Takip Sistemi - Firebase Auth</title>
+  <style>
+    body { font-family: Arial; margin: 20px; }
+    label, select, input, button { margin: 5px 0; display: block; }
+    button { padding: 6px 12px; margin-top: 10px; }
+    .section { margin-bottom: 20px; border: 1px solid #ccc; padding: 15px; border-radius: 8px; }
+    #authSection, #appSection { max-width: 400px; }
+    #appSection { display: none; }
+    #logoutBtn { background: #c33; color: white; border: none; cursor: pointer; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
 
+  <h2>Gelir/Gider Takip Sistemi</h2>
+
+  <div id="authSection" class="section">
+    <h3>Kayıt Ol / Giriş Yap</h3>
+    <input type="email" id="email" placeholder="Email" required />
+    <input type="password" id="password" placeholder="Şifre" required />
+    <button id="signupBtn">Kayıt Ol</button>
+    <button id="loginBtn">Giriş Yap</button>
+    <div id="authMessage" style="color:red;margin-top:10px;"></div>
+  </div>
+
+  <div id="appSection" class="section">
+    <button id="logoutBtn">Çıkış Yap</button>
+
+    <form id="transactionForm">
+      <label for="type">Tür:</label>
+      <select id="type" required>
+        <option value="Gelir">Gelir</option>
+        <option value="Gider">Gider</option>
+      </select>
+
+      <label for="subcategory">Alt Kategori:</label>
+      <select id="subcategory" required></select>
+      <input type="text" id="newSubcategory" placeholder="Yeni Alt Kategori Ekle" />
+      <button type="button" onclick="addSubcategory()">Alt Kategori Ekle</button>
+
+      <label for="amount">Tutar:</label>
+      <input type="number" id="amount" required />
+
+      <label for="description">Açıklama:</label>
+      <input type="text" id="description" required />
+
+      <label for="date">Tarih:</label>
+      <input type="date" id="date" required />
+
+      <button type="submit" id="addBtn">Ekle</button>
+    </form>
+
+    <h3>İşlem Listesi</h3>
+    <select id="transactionList" size="8" style="width: 100%;"></select>
+    <h4>Toplam Gelir: <span id="totalIncome">0</span> TL</h4>
+    <h4>Toplam Gider: <span id="totalExpense">0</span> TL</h4>
+    <h4>Toplam Kar: <span id="totalProfit">0</span> TL</h4>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    // Firebase imports
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+    import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyCTZXqmpVQeYwm2PoDwEYih9vDDl3A5rtI",
       authDomain: "gelir-gider-d3dc3.firebaseapp.com",
@@ -18,163 +79,182 @@
       measurementId: "G-B8NKY7SR14"
     };
 
+    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const db = getDatabase(app);
 
-    window.login = function () {
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
+    // Elements
+    const authSection = document.getElementById("authSection");
+    const appSection = document.getElementById("appSection");
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const signupBtn = document.getElementById("signupBtn");
+    const loginBtn = document.getElementById("loginBtn");
+    const authMessage = document.getElementById("authMessage");
+    const logoutBtn = document.getElementById("logoutBtn");
 
-      signInWithEmailAndPassword(auth, email, password)
-        .then(userCredential => {
-          console.log("Giriş başarılı:", userCredential.user.email);
-          document.getElementById("loginDiv").style.display = "none";
-          const appDiv = document.getElementById("appDiv");
-          appDiv.style.display = "block";
-          appDiv.style.visibility = "visible";
-          appDiv.style.opacity = "1";
-          document.getElementById("welcome").innerText = "Hoş geldin, " + email;
-          loadReport();
-        })
-        .catch(error => {
-          console.error("Giriş Hatası:", error);
-          alert("Giriş Hatası: " + error.message);
-        });
-    }
+    const typeEl = document.getElementById("type");
+    const subcategoryEl = document.getElementById("subcategory");
+    const newSubcategoryInput = document.getElementById("newSubcategory");
+    const amountInput = document.getElementById("amount");
+    const descriptionInput = document.getElementById("description");
+    const dateInput = document.getElementById("date");
+    const transactionForm = document.getElementById("transactionForm");
+    const transactionList = document.getElementById("transactionList");
+    const totalIncomeEl = document.getElementById("totalIncome");
+    const totalExpenseEl = document.getElementById("totalExpense");
+    const totalProfitEl = document.getElementById("totalProfit");
 
-    window.register = function () {
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
+    let subcategories = { Gelir: ["Maaş", "Yatırım"], Gider: ["Kira", "Fatura"] };
+    let currentUser = null;
 
-      createUserWithEmailAndPassword(auth, email, password)
-        .then(userCredential => {
-          console.log("Kayıt başarılı:", userCredential.user.email);
-          alert("Kayıt başarılı! Şimdi giriş yapabilirsiniz.");
-        })
-        .catch(error => {
-          console.error("Kayıt Hatası:", error);
-          alert("Kayıt Hatası: " + error.message);
-        });
-    }
-
-    window.logout = function () {
-      signOut(auth).then(() => {
-        document.getElementById("loginDiv").style.display = "block";
-        const appDiv = document.getElementById("appDiv");
-        appDiv.style.display = "none";
-        appDiv.style.visibility = "hidden";
-        appDiv.style.opacity = "0";
-        document.getElementById("welcome").innerText = "";
-        document.getElementById("report").innerText = "";
+    // Update subcategory options
+    function updateSubcategoryOptions() {
+      const type = typeEl.value;
+      subcategoryEl.innerHTML = "";
+      subcategories[type].forEach(sub => {
+        const opt = document.createElement("option");
+        opt.value = sub;
+        opt.textContent = sub;
+        subcategoryEl.appendChild(opt);
       });
     }
 
-    window.addTransaction = async function () {
-      const user = auth.currentUser;
-      if (!user) {
-        alert("Lütfen önce giriş yapın.");
-        return;
+    // Add new subcategory
+    window.addSubcategory = function () {
+      const type = typeEl.value;
+      const newSub = newSubcategoryInput.value.trim();
+      if (!newSub) return alert("Alt kategori boş olamaz.");
+      if (!subcategories[type].includes(newSub)) {
+        subcategories[type].push(newSub);
+        updateSubcategoryOptions();
+        newSubcategoryInput.value = "";
       }
-      const type = document.getElementById("type").value;
-      const amount = parseFloat(document.getElementById("amount").value);
-      if (isNaN(amount) || amount <= 0) {
-        alert("Lütfen geçerli bir tutar girin.");
-        return;
-      }
-      const description = document.getElementById("description").value || "";
+    };
 
-      try {
-        await addDoc(collection(db, "transactions"), {
-          userId: user.uid,
-          type,
-          amount,
-          description,
-          createdAt: new Date()
-        });
-        alert("Kayıt eklendi.");
-        document.getElementById("amount").value = "";
-        document.getElementById("description").value = "";
-        loadReport();
-      } catch (e) {
-        console.error("Kayıt ekleme hatası:", e);
-        alert("Kayıt eklenirken hata oluştu.");
-      }
-    }
+    typeEl.addEventListener("change", updateSubcategoryOptions);
 
-    async function loadReport() {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      try {
-        const q = query(collection(db, "transactions"), where("userId", "==", user.uid));
-        const querySnapshot = await getDocs(q);
-
-        let totalIncome = 0;
-        let totalExpense = 0;
-
-        querySnapshot.forEach(doc => {
-          const data = doc.data();
-          if (data.type === "Gelir") totalIncome += data.amount;
-          else totalExpense += data.amount;
-        });
-
-        document.getElementById("report").innerText =
-          `Toplam Gelir: ${totalIncome.toFixed(2)} TL\n` +
-          `Toplam Gider: ${totalExpense.toFixed(2)} TL\n` +
-          `Net: ${(totalIncome - totalExpense).toFixed(2)} TL`;
-      } catch (e) {
-        console.error("Rapor yükleme hatası:", e);
-        document.getElementById("report").innerText = "Rapor yüklenirken hata oluştu.";
-      }
-    }
-
-    onAuthStateChanged(auth, user => {
+    // Listen auth state
+    onAuthStateChanged(auth, (user) => {
       if (user) {
-        document.getElementById("loginDiv").style.display = "none";
-        const appDiv = document.getElementById("appDiv");
-        appDiv.style.display = "block";
-        appDiv.style.visibility = "visible";
-        appDiv.style.opacity = "1";
-        document.getElementById("welcome").innerText = "Hoş geldin, " + user.email;
-        loadReport();
+        currentUser = user;
+        authSection.style.display = "none";
+        appSection.style.display = "block";
+        loadTransactions();
+        updateSubcategoryOptions();
       } else {
-        document.getElementById("loginDiv").style.display = "block";
-        const appDiv = document.getElementById("appDiv");
-        appDiv.style.display = "none";
-        appDiv.style.visibility = "hidden";
-        appDiv.style.opacity = "0";
-        document.getElementById("welcome").innerText = "";
-        document.getElementById("report").innerText = "";
+        currentUser = null;
+        authSection.style.display = "block";
+        appSection.style.display = "none";
+        clearTransactionsUI();
       }
     });
+
+    // Sign up
+    signupBtn.addEventListener("click", () => {
+      authMessage.textContent = "";
+      const email = emailInput.value.trim();
+      const password = passwordInput.value.trim();
+      if (!email || !password) {
+        authMessage.textContent = "Email ve şifre gereklidir.";
+        return;
+      }
+      createUserWithEmailAndPassword(auth, email, password)
+        .then(() => {
+          authMessage.style.color = "green";
+          authMessage.textContent = "Kayıt başarılı! Giriş yapabilirsiniz.";
+        })
+        .catch(err => {
+          authMessage.style.color = "red";
+          authMessage.textContent = "Hata: " + err.message;
+        });
+    });
+
+    // Login
+    loginBtn.addEventListener("click", () => {
+      authMessage.textContent = "";
+      const email = emailInput.value.trim();
+      const password = passwordInput.value.trim();
+      if (!email || !password) {
+        authMessage.textContent = "Email ve şifre gereklidir.";
+        return;
+      }
+      signInWithEmailAndPassword(auth, email, password)
+        .catch(err => {
+          authMessage.style.color = "red";
+          authMessage.textContent = "Hata: " + err.message;
+        });
+    });
+
+    // Logout
+    logoutBtn.addEventListener("click", () => {
+      signOut(auth);
+    });
+
+    // Load transactions from Firebase DB
+    function loadTransactions() {
+      const userTransactionsRef = ref(db, 'users/' + currentUser.uid + '/transactions');
+      onValue(userTransactionsRef, (snapshot) => {
+        const data = snapshot.val();
+        let transactions = [];
+        if (data) {
+          transactions = Object.values(data);
+          // each transaction has key?
+        }
+        renderTransactions(transactions);
+      });
+    }
+
+    // Render transactions to UI and show totals
+    function renderTransactions(transactions) {
+      transactionList.innerHTML = "";
+      let totalIncome = 0;
+      let totalExpense = 0;
+      transactions.forEach((t, i) => {
+        const option = document.createElement("option");
+        option.value = i;
+        option.text = `${t.date} - ${t.type}: ${t.amount} TL - ${t.subcategory} - ${t.description}`;
+        transactionList.appendChild(option);
+        if (t.type === "Gelir") totalIncome += Number(t.amount);
+        else totalExpense += Number(t.amount);
+      });
+      totalIncomeEl.textContent = totalIncome.toFixed(2);
+      totalExpenseEl.textContent = totalExpense.toFixed(2);
+      totalProfitEl.textContent = (totalIncome - totalExpense).toFixed(2);
+    }
+
+    function clearTransactionsUI() {
+      transactionList.innerHTML = "";
+      totalIncomeEl.textContent = "0";
+      totalExpenseEl.textContent = "0";
+      totalProfitEl.textContent = "0";
+    }
+
+    // Add new transaction to Firebase DB
+    transactionForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (!currentUser) return alert("Lütfen giriş yapınız.");
+
+      const newTransaction = {
+        type: typeEl.value,
+        subcategory: subcategoryEl.value,
+        amount: parseFloat(amountInput.value),
+        description: descriptionInput.value,
+        date: dateInput.value
+      };
+
+      const userTransactionsRef = ref(db, 'users/' + currentUser.uid + '/transactions');
+      push(userTransactionsRef, newTransaction)
+        .then(() => {
+          transactionForm.reset();
+        })
+        .catch(err => alert("Hata: " + err.message));
+    });
+
+    updateSubcategoryOptions();
   </script>
-</head>
-<body>
-  <h1>Gelir Gider Uygulaması</h1>
 
-  <div id="loginDiv">
-    <input type="email" id="email" placeholder="Email" /><br />
-    <input type="password" id="password" placeholder="Şifre" /><br />
-    <button onclick="login()">Giriş Yap</button>
-    <button onclick="register()">Kayıt Ol</button>
-  </div>
-
-  <div id="appDiv" style="display:none; visibility:hidden; opacity:0; transition: opacity 0.3s ease;">
-    <p id="welcome"></p>
-    <button onclick="logout()">Çıkış Yap</button>
-
-    <h3>Yeni Gelir/Gider Ekle</h3>
-    <select id="type">
-      <option value="Gelir">Gelir</option>
-      <option value="Gider">Gider</option>
-    </select><br />
-    <input type="number" id="amount" placeholder="Tutar" /><br />
-    <input type="text" id="description" placeholder="Açıklama" /><br />
-    <button onclick="addTransaction()">Ekle</button>
-
-    <h3>Rapor</h3>
-    <pre id="report"></pre>
-  </div>
 </body>
 </html>
