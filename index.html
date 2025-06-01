@@ -2,56 +2,165 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
-  <title>Firebase Auth Basit Örnek</title>
+  <title>Gelir Gider Takip Sistemi</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      max-width: 400px;
-      margin: 40px auto;
-      padding: 20px;
+      max-width: 600px;
+      margin: 20px auto;
+      padding: 15px;
       border: 1px solid #ccc;
       border-radius: 10px;
     }
-    input, button {
+    h2 {
+      text-align: center;
+      color: #1976d2;
+    }
+    input, select, button {
       width: 100%;
-      padding: 10px;
-      margin: 8px 0;
+      padding: 8px;
+      margin: 6px 0 12px 0;
       font-size: 16px;
+      box-sizing: border-box;
     }
     button {
-      cursor: pointer;
       background-color: #1976d2;
-      border: none;
       color: white;
+      border: none;
+      cursor: pointer;
       border-radius: 5px;
     }
     button:hover {
       background-color: #0d47a1;
     }
+    #logout-btn {
+      background-color: #c62828;
+      margin-bottom: 20px;
+    }
+    #logout-btn:hover {
+      background-color: #8e0000;
+    }
     #message {
-      margin-top: 15px;
       font-weight: bold;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    #report {
+      margin-top: 20px;
+      border-top: 2px solid #1976d2;
+      padding-top: 15px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #1976d2;
+      padding: 8px;
+      text-align: center;
+    }
+    #pdf-btn {
+      margin-top: 15px;
+      background-color: #388e3c;
+    }
+    #pdf-btn:hover {
+      background-color: #27632a;
     }
   </style>
 </head>
 <body>
-  <h2>Firebase Kayıt ve Giriş</h2>
 
-  <input type="email" id="email" placeholder="Email adresinizi girin" />
-  <input type="password" id="password" placeholder="Şifrenizi girin" />
+  <h2>Gelir Gider Takip Sistemi</h2>
 
-  <button id="register-btn">Kayıt Ol</button>
-  <button id="login-btn">Giriş Yap</button>
+  <!-- Giriş Kayıt Bölümü -->
+  <div id="auth-section">
+    <input type="email" id="email" placeholder="Email adresinizi girin" />
+    <input type="password" id="password" placeholder="Şifrenizi girin" />
+    <button id="register-btn">Kayıt Ol</button>
+    <button id="login-btn">Giriş Yap</button>
+  </div>
 
   <div id="message"></div>
 
-  <!-- Firebase App (the core Firebase SDK) -->
+  <!-- Ana uygulama bölümü, giriş sonrası görünür -->
+  <div id="app-section" style="display:none;">
+
+    <button id="logout-btn">Çıkış Yap</button>
+
+    <!-- Gelir Gider Ekleme Formu -->
+    <h3>Gelir / Gider Ekle</h3>
+
+    <label for="type">Tür</label>
+    <select id="type">
+      <option value="gelir">Gelir</option>
+      <option value="gider">Gider</option>
+    </select>
+
+    <label for="category">Kategori</label>
+    <select id="category">
+      <option value="">Kategori seçin veya yeni ekleyin</option>
+      <option value="Maaş">Maaş</option>
+      <option value="Yiyecek">Yiyecek</option>
+      <option value="Ulaşım">Ulaşım</option>
+      <option value="Eğlence">Eğlence</option>
+    </select>
+    <input type="text" id="new-category" placeholder="Yeni kategori ekle (boş bırakabilirsiniz)" />
+
+    <label for="subcategory">Alt Kategori</label>
+    <input type="text" id="subcategory" placeholder="Alt kategori girin (isteğe bağlı)" />
+
+    <label for="amount">Tutar (₺)</label>
+    <input type="number" id="amount" min="0" step="0.01" placeholder="Örn: 100.50" />
+
+    <label for="date">Tarih</label>
+    <input type="date" id="date" />
+
+    <button id="add-entry-btn">Ekle</button>
+
+    <!-- Filtreleme ve Rapor -->
+    <div id="report">
+
+      <h3>Raporlama</h3>
+
+      <label for="filter-start">Başlangıç Tarihi</label>
+      <input type="date" id="filter-start" />
+
+      <label for="filter-end">Bitiş Tarihi</label>
+      <input type="date" id="filter-end" />
+
+      <button id="filter-btn">Filtrele</button>
+      <button id="pdf-btn">PDF Olarak İndir</button>
+
+      <div id="totals" style="margin-top: 15px; font-weight: bold;"></div>
+
+      <table id="entries-table" style="display:none;">
+        <thead>
+          <tr>
+            <th>Tarih</th>
+            <th>Tür</th>
+            <th>Kategori</th>
+            <th>Alt Kategori</th>
+            <th>Tutar (₺)</th>
+          </tr>
+        </thead>
+        <tbody id="entries-tbody"></tbody>
+      </table>
+
+    </div>
+
+  </div>
+
+  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <!-- Firebase Authentication SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+  <!-- jsPDF PDF oluşturmak için -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <script>
-    // Firebase yapılandırmanı buraya yapıştır
+    // Firebase config bilgilerini kendi projenden al ve buraya yapıştır
     const firebaseConfig = {
       apiKey: "AIzaSyCTZXqmpVQeYwm2PoDwEYih9vDDl3A5rtI",
       authDomain: "gelir-gider-d3dc3.firebaseapp.com",
@@ -65,63 +174,281 @@
     // Firebase başlat
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // HTML elemanları
+    const authSection = document.getElementById('auth-section');
+    const appSection = document.getElementById('app-section');
+    const messageDiv = document.getElementById('message');
 
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
-    const messageDiv = document.getElementById('message');
 
-    // Kayıt olma işlemi
-    document.getElementById('register-btn').addEventListener('click', () => {
+    const registerBtn = document.getElementById('register-btn');
+    const loginBtn = document.getElementById('login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+
+    const typeSelect = document.getElementById('type');
+    const categorySelect = document.getElementById('category');
+    const newCategoryInput = document.getElementById('new-category');
+    const subcategoryInput = document.getElementById('subcategory');
+    const amountInput = document.getElementById('amount');
+    const dateInput = document.getElementById('date');
+
+    const addEntryBtn = document.getElementById('add-entry-btn');
+
+    const filterStart = document.getElementById('filter-start');
+    const filterEnd = document.getElementById('filter-end');
+    const filterBtn = document.getElementById('filter-btn');
+
+    const entriesTable = document.getElementById('entries-table');
+    const entriesTbody = document.getElementById('entries-tbody');
+    const totalsDiv = document.getElementById('totals');
+
+    const pdfBtn = document.getElementById('pdf-btn');
+
+    // Mesaj göster
+    function showMessage(text, isError = false) {
+      messageDiv.textContent = text;
+      messageDiv.style.color = isError ? 'red' : 'green';
+    }
+
+    // Kullanıcı oturum durumu
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        // Giriş yapıldı
+        authSection.style.display = 'none';
+        appSection.style.display = 'block';
+        showMessage(`Hoş geldiniz, ${user.email}`);
+
+        // Bugünün tarihini default atayalım
+        if (!dateInput.value) {
+          const today = new Date().toISOString().substring(0,10);
+          dateInput.value = today;
+        }
+
+        loadEntries();
+      } else {
+        // Çıkış yapıldı
+        authSection.style.display = 'block';
+        appSection.style.display = 'none';
+        showMessage('');
+      }
+    });
+
+    // Kayıt ol
+    registerBtn.addEventListener('click', () => {
       const email = emailInput.value.trim();
       const password = passwordInput.value.trim();
+
       if (!email || !password) {
-        messageDiv.textContent = "Email ve şifre boş olamaz!";
-        messageDiv.style.color = 'red';
+        showMessage("Email ve şifre boş olamaz!", true);
         return;
       }
 
       auth.createUserWithEmailAndPassword(email, password)
         .then(() => {
-          messageDiv.textContent = "Kayıt başarılı! Giriş yapabilirsiniz.";
-          messageDiv.style.color = 'green';
+          showMessage("Kayıt başarılı! Giriş yapabilirsiniz.");
         })
-        .catch(error => {
-          messageDiv.textContent = "Kayıt hatası: " + error.message;
-          messageDiv.style.color = 'red';
+        .catch(err => {
+          showMessage("Kayıt hatası: " + err.message, true);
         });
     });
 
-    // Giriş yapma işlemi
-    document.getElementById('login-btn').addEventListener('click', () => {
+    // Giriş yap
+    loginBtn.addEventListener('click', () => {
       const email = emailInput.value.trim();
       const password = passwordInput.value.trim();
+
       if (!email || !password) {
-        messageDiv.textContent = "Email ve şifre boş olamaz!";
-        messageDiv.style.color = 'red';
+        showMessage("Email ve şifre boş olamaz!", true);
         return;
       }
 
       auth.signInWithEmailAndPassword(email, password)
         .then(() => {
-          messageDiv.textContent = "Giriş başarılı! Hoş geldiniz.";
-          messageDiv.style.color = 'green';
-          // Burada giriş sonrası yönlendirme ya da başka işlemler yapabilirsiniz
+          showMessage("Giriş başarılı!");
         })
-        .catch(error => {
-          messageDiv.textContent = "Giriş hatası: " + error.message;
-          messageDiv.style.color = 'red';
+        .catch(err => {
+          showMessage("Giriş hatası: " + err.message, true);
         });
     });
 
-    // Oturum durumunu dinle (opsiyonel)
-    auth.onAuthStateChanged(user => {
-      if (user) {
-        messageDiv.textContent = `Hoş geldiniz, ${user.email}`;
-        messageDiv.style.color = 'green';
-      } else {
-        // Kullanıcı çıkış yapmış durumda
-      }
+    // Çıkış yap
+    logoutBtn.addEventListener('click', () => {
+      auth.signOut();
     });
+
+    // Gelir/Gider ekle
+    addEntryBtn.addEventListener('click', () => {
+      let type = typeSelect.value;
+      let category = newCategoryInput.value.trim() || categorySelect.value;
+      let subcategory = subcategoryInput.value.trim();
+      let amount = parseFloat(amountInput.value);
+      let date = dateInput.value;
+
+      if (!category) {
+        alert("Kategori boş olamaz. Var olanı seçin veya yeni kategori yazın.");
+        return;
+      }
+      if (!amount || amount <= 0) {
+        alert("Geçerli bir tutar girin.");
+        return;
+      }
+      if (!date) {
+        alert("Tarih seçin.");
+        return;
+      }
+
+      const user = auth.currentUser;
+      if (!user) {
+        alert("Lütfen giriş yapın.");
+        return;
+      }
+
+      const entry = {
+        uid: user.uid,
+        type,
+        category,
+        subcategory,
+        amount,
+        date,
+        timestamp: firebase.firestore.Timestamp.fromDate(new Date(date))
+      };
+
+      db.collection('entries').add(entry)
+        .then(() => {
+          showMessage("Girdi başarıyla eklendi.");
+          // Formu temizle
+          newCategoryInput.value = '';
+          subcategoryInput.value = '';
+          amountInput.value = '';
+          // Tarih alanını bugüne çekelim
+          dateInput.value = new Date().toISOString().substring(0,10);
+          loadEntries();
+        })
+        .catch(err => {
+          showMessage("Ekleme hatası: " + err.message, true);
+        });
+    });
+
+    // Gelir/Gider kayıtlarını yükle ve filtrele
+    function loadEntries() {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      let startDate = filterStart.value ? new Date(filterStart.value) : null;
+      let endDate = filterEnd.value ? new Date(filterEnd.value) : null;
+
+      // Firestore sorgusu yap
+      let query = db.collection('entries').where('uid', '==', user.uid);
+
+      if (startDate) {
+        query = query.where('timestamp', '>=', firebase.firestore.Timestamp.fromDate(startDate));
+      }
+      if (endDate) {
+        // Bitiş tarihini 23:59:59 olarak al
+        endDate.setHours(23,59,59,999);
+        query = query.where('timestamp', '<=', firebase.firestore.Timestamp.fromDate(endDate));
+      }
+
+      query.orderBy('timestamp', 'desc').get()
+        .then(snapshot => {
+          const entries = [];
+          snapshot.forEach(doc => {
+            entries.push({...doc.data(), id: doc.id});
+          });
+          displayEntries(entries);
+        })
+        .catch(err => {
+          showMessage("Veri yükleme hatası: " + err.message, true);
+        });
+    }
+
+    // Tabloya yazdır
+    function displayEntries(entries) {
+      entriesTbody.innerHTML = '';
+
+      if (entries.length === 0) {
+        entriesTable.style.display = 'none';
+        totalsDiv.textContent = "Gösterilecek kayıt yok.";
+        return;
+      }
+
+      entriesTable.style.display = 'table';
+
+      let totalGelir = 0;
+      let totalGider = 0;
+
+      entries.forEach(e => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${e.date}</td>
+          <td>${e.type === 'gelir' ? 'Gelir' : 'Gider'}</td>
+          <td>${e.category}</td>
+          <td>${e.subcategory || '-'}</td>
+          <td>${e.amount.toFixed(2)}</td>
+        `;
+        entriesTbody.appendChild(tr);
+
+        if (e.type === 'gelir') totalGelir += e.amount;
+        else if (e.type === 'gider') totalGider += e.amount;
+      });
+
+      const net = totalGelir - totalGider;
+
+      totalsDiv.innerHTML = `
+        Toplam Gelir: ₺${totalGelir.toFixed(2)}<br>
+        Toplam Gider: ₺${totalGider.toFixed(2)}<br>
+        Net Kar/Zarar: ₺${net.toFixed(2)}
+      `;
+    }
+
+    // Filtreleme butonu
+    filterBtn.addEventListener('click', () => {
+      loadEntries();
+    });
+
+    // PDF oluşturma jsPDF ile
+    pdfBtn.addEventListener('click', () => {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      doc.setFontSize(18);
+      doc.text("Gelir Gider Raporu", 14, 22);
+
+      let y = 30;
+      doc.setFontSize(12);
+      doc.text(totalsDiv.textContent, 14, y);
+      y += 10;
+
+      const rows = [];
+      entriesTbody.querySelectorAll('tr').forEach(tr => {
+        const cols = Array.from(tr.querySelectorAll('td')).map(td => td.textContent);
+        rows.push(cols);
+      });
+
+      if (rows.length === 0) {
+        alert("Rapor için gösterilecek kayıt yok.");
+        return;
+      }
+
+      // Tablo başlıkları
+      const headers = [["Tarih", "Tür", "Kategori", "Alt Kategori", "Tutar (₺)"]];
+
+      doc.autoTable({
+        startY: y,
+        head: headers,
+        body: rows,
+        theme: 'grid'
+      });
+
+      doc.save("gelir-gider-raporu.pdf");
+    });
+
   </script>
+
+  <!-- jsPDF Autotable plugin için -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 </body>
 </html>
