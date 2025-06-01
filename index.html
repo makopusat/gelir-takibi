@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Gelir Gider Takip - PDF ve Rapor</title>
+<title>Gelir Gider Takip - Kategori Düzenleme ve Silme</title>
 <style>
   body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f0f2f5; }
   header { background: #4a90e2; color: white; padding: 1rem; text-align: center; }
-  main { max-width: 900px; margin: 20px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px #ccc;}
+  main, section { max-width: 900px; margin: 20px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px #ccc;}
   h2 { margin-top: 0; }
   label { display: block; margin: 10px 0 5px; font-weight: bold; }
   input[type=text], input[type=number], input[type=date], select {
@@ -20,6 +20,7 @@
     cursor: pointer;
   }
   button:hover { background-color: #357abd; }
+  #exportPdfBtn { background-color: #28a745; }
   .hidden { display: none; }
   table { width: 100%; border-collapse: collapse; margin-top: 20px;}
   th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
@@ -27,6 +28,35 @@
   #totals { margin-top: 15px; font-weight: bold; font-size: 1.1rem; }
   .message { padding: 10px; background-color: #d4edda; color: #155724; margin-bottom: 15px; border-radius: 5px; display:none; }
   .error { background-color: #f8d7da; color: #721c24; }
+  .category-list { margin-top: 10px; }
+  .category-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    margin-bottom: 4px;
+    border-radius: 4px;
+  }
+  .category-item input[type="text"] {
+    flex-grow: 1;
+    margin-right: 10px;
+    padding: 5px;
+    font-size: 1rem;
+  }
+  .btn-small {
+    padding: 5px 8px;
+    margin-left: 5px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border-radius: 4px;
+    border: none;
+    color: white;
+  }
+  .btn-edit { background-color: #ffc107; }
+  .btn-delete { background-color: #dc3545; }
+  .btn-save { background-color: #28a745; }
+  .btn-cancel { background-color: #6c757d; }
 </style>
 </head>
 <body>
@@ -47,6 +77,8 @@
   <label for="categorySelect">Kategori Seç:</label>
   <select id="categorySelect"></select>
 
+  <div class="category-list" id="categoryListContainer"></div>
+
   <label for="addCategoryInput">Yeni Kategori Ekle (manuel):</label>
   <input type="text" id="addCategoryInput" placeholder="Yeni kategori adı" />
   <button id="addCategoryBtn">Kategori Ekle</button>
@@ -54,7 +86,7 @@
   <label for="subcategorySelect">Alt Kategori Seç:</label>
   <select id="subcategorySelect"></select>
 
-  <label for="addSubcategoryInput">Yeni Alt Kategori Ekle (manuel, seçili kategoriye):</label>
+  <label for="addSubcategoryInput">Yeni Alt Kategori Ekle (seçili kategoriye):</label>
   <input type="text" id="addSubcategoryInput" placeholder="Yeni alt kategori adı" />
   <button id="addSubcategoryBtn">Alt Kategori Ekle</button>
 
@@ -75,7 +107,7 @@
   <label for="endDate">Bitiş Tarihi:</label>
   <input type="date" id="endDate" />
   <button id="filterBtn">Filtrele</button>
-  <button id="exportPdfBtn" style="background-color:#28a745; margin-top: 10px;">PDF Olarak İndir</button>
+  <button id="exportPdfBtn">PDF Olarak İndir</button>
 
   <table id="entriesTable" style="display:none;">
     <thead>
@@ -95,20 +127,17 @@
 </section>
 
 <script>
-  // Başlangıç veri yapıları ve DOM referansları
-  let categories = ['Maaş', 'Kira', 'Market', 'Elektrik'];
-  let subcategoriesByCategory = {
-    'Maaş': ['Bonus', 'Aylık'],
-    'Kira': ['Ev', 'İşyeri'],
-    'Market': [],
-    'Elektrik': []
-  };
+  // Başlangıçta kategori listesi boş
+  let categories = [];
+  let subcategoriesByCategory = {};
   let entries = [];
 
   const typeSelect = document.getElementById('type');
   const categorySelect = document.getElementById('categorySelect');
   const addCategoryInput = document.getElementById('addCategoryInput');
   const addCategoryBtn = document.getElementById('addCategoryBtn');
+
+  const categoryListContainer = document.getElementById('categoryListContainer');
 
   const subcategorySelect = document.getElementById('subcategorySelect');
   const addSubcategoryInput = document.getElementById('addSubcategoryInput');
@@ -153,10 +182,125 @@
       opt.textContent = cat;
       categorySelect.appendChild(opt);
     });
+
+    // Aynı zamanda kategori düzenleme/silme listesi de güncellenir
+    renderCategoryList();
+  }
+
+  function renderCategoryList() {
+    categoryListContainer.innerHTML = '';
+    if (categories.length === 0) {
+      categoryListContainer.textContent = 'Kategori listesi boş.';
+      return;
+    }
+    categories.forEach(cat => {
+      const div = document.createElement('div');
+      div.className = 'category-item';
+
+      // Başlangıçta sadece label, düzenleme modunda input gösterilecek
+      const label = document.createElement('span');
+      label.textContent = cat;
+      label.style.flexGrow = '1';
+
+      // Düzenleme inputu
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = cat;
+      input.className = 'hidden';
+
+      // Düzenle, Sil, Kaydet, İptal butonları
+      const editBtn = document.createElement('button');
+      editBtn.textContent = 'Düzenle';
+      editBtn.className = 'btn-small btn-edit';
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.textContent = 'Sil';
+      deleteBtn.className = 'btn-small btn-delete';
+
+      const saveBtn = document.createElement('button');
+      saveBtn.textContent = 'Kaydet';
+      saveBtn.className = 'btn-small btn-save hidden';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.textContent = 'İptal';
+      cancelBtn.className = 'btn-small btn-cancel hidden';
+
+      div.appendChild(label);
+      div.appendChild(input);
+      div.appendChild(editBtn);
+      div.appendChild(deleteBtn);
+      div.appendChild(saveBtn);
+      div.appendChild(cancelBtn);
+
+      categoryListContainer.appendChild(div);
+
+      editBtn.onclick = () => {
+        label.classList.add('hidden');
+        input.classList.remove('hidden');
+        editBtn.classList.add('hidden');
+        deleteBtn.classList.add('hidden');
+        saveBtn.classList.remove('hidden');
+        cancelBtn.classList.remove('hidden');
+      };
+
+      cancelBtn.onclick = () => {
+        input.value = cat;
+        label.classList.remove('hidden');
+        input.classList.add('hidden');
+        editBtn.classList.remove('hidden');
+        deleteBtn.classList.remove('hidden');
+        saveBtn.classList.add('hidden');
+        cancelBtn.classList.add('hidden');
+      };
+
+      saveBtn.onclick = () => {
+        const newName = input.value.trim();
+        if (!newName) {
+          showError('Kategori adı boş olamaz.');
+          return;
+        }
+        if (categories.includes(newName) && newName !== cat) {
+          showError('Bu kategori zaten mevcut.');
+          return;
+        }
+        // Kategoriyi güncelle
+        const idx = categories.indexOf(cat);
+        if (idx !== -1) {
+          categories[idx] = newName;
+
+          // Alt kategorileri yeni kategoriye taşı
+          if (subcategoriesByCategory[cat]) {
+            subcategoriesByCategory[newName] = subcategoriesByCategory[cat];
+            delete subcategoriesByCategory[cat];
+          }
+          // Gelir/gider kayıtlarında kategori adı güncelle
+          entries.forEach(e => { if (e.category === cat) e.category = newName; });
+
+          loadCategories();
+          applyFilter();
+          showMessage('Kategori güncellendi.');
+        }
+      };
+
+      deleteBtn.onclick = () => {
+        if (!confirm(`"${cat}" kategorisini silmek istediğinize emin misiniz?`)) return;
+        const idx = categories.indexOf(cat);
+        if (idx !== -1) {
+          categories.splice(idx, 1);
+          // Alt kategorileri sil
+          delete subcategoriesByCategory[cat];
+          // NOT: Kategori silindiğinde o kategoriye ait kayıtlar kalır.
+          // Dilersen burada onları da silebilirsin.
+          loadCategories();
+          applyFilter();
+          showMessage('Kategori silindi.');
+        }
+      };
+    });
   }
 
   function loadSubcategories(cat) {
-    subcategorySelect.innerHTML = '<option value="">(Alt kategori seçiniz veya yeni ekleyin)</option>';
+    subcategorySelect.innerHTML = '<option value="">Seçiniz...</option>';
     if (!cat || !subcategoriesByCategory[cat]) return;
     subcategoriesByCategory[cat].forEach(sub => {
       const opt = document.createElement('option');
@@ -166,30 +310,29 @@
     });
   }
 
+  addCategoryBtn.addEventListener('click', () => {
+    const newCat = addCategoryInput.value.trim();
+    if (!newCat) {
+      showError('Kategori boş olamaz.');
+      return;
+    }
+    if (categories.includes(newCat)) {
+      showError('Bu kategori zaten mevcut.');
+      return;
+    }
+    categories.push(newCat);
+    addCategoryInput.value = '';
+    loadCategories();
+    showMessage('Kategori eklendi.');
+  });
+
   categorySelect.addEventListener('change', () => {
     loadSubcategories(categorySelect.value);
   });
 
-  addCategoryBtn.addEventListener('click', () => {
-    const newCat = addCategoryInput.value.trim();
-    if (!newCat) {
-      showError('Kategori adı boş olamaz!');
-      return;
-    }
-    if (categories.includes(newCat)) {
-      showError('Bu kategori zaten mevcut!');
-      return;
-    }
-    categories.push(newCat);
-    subcategoriesByCategory[newCat] = [];
-    loadCategories();
-    addCategoryInput.value = '';
-    showMessage('Kategori eklendi.');
-  });
-
   addSubcategoryBtn.addEventListener('click', () => {
-    const newSub = addSubcategoryInput.value.trim();
     const selectedCat = categorySelect.value;
+    const newSub = addSubcategoryInput.value.trim();
     if (!selectedCat) {
       showError('Lütfen önce kategori seçin!');
       return;
@@ -241,7 +384,7 @@
 
     amountInput.value = '';
     descriptionInput.value = '';
-    dateInput.value = new Date().toISOString().substring(0,10); // bugünün tarihi
+    dateInput.value = new Date().toISOString().substring(0,10);
 
     applyFilter();
   });
@@ -254,6 +397,7 @@
     return true;
   }
 
+  // Raporlama fonksiyonu: aynı tür ve kategori bazında toplama yapacak
   function displayEntries(entriesToShow) {
     entriesTbody.innerHTML = '';
     if (entriesToShow.length === 0) {
@@ -261,25 +405,34 @@
       totalsDiv.textContent = 'Gösterilecek kayıt bulunamadı.';
       return;
     }
-
     entriesTable.style.display = 'table';
+
+    // Tür + kategori bazında topla
+    const aggregated = {};
+    entriesToShow.forEach(entry => {
+      const key = `${entry.type}|${entry.category}`;
+      if (!aggregated[key]) aggregated[key] = 0;
+      aggregated[key] += entry.amount;
+    });
 
     let totalIncome = 0;
     let totalExpense = 0;
 
-    entriesToShow.forEach(entry => {
+    for (const key in aggregated) {
+      const [type, category] = key.split('|');
+      const amount = aggregated[key];
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${entry.type}</td>
-        <td>${entry.category}</td>
-        <td>${entry.subcategory || '-'}</td>
-        <td>${entry.amount.toFixed(2)}</td>
+        <td>${type}</td>
+        <td>${category}</td>
+        <td>-</td>
+        <td>${amount.toFixed(2)}</td>
       `;
       entriesTbody.appendChild(tr);
 
-      if (entry.type === 'gelir') totalIncome += entry.amount;
-      else totalExpense += entry.amount;
-    });
+      if (type === 'gelir') totalIncome += amount;
+      else totalExpense += amount;
+    }
 
     totalsDiv.textContent = `Toplam Gelir: ${totalIncome.toFixed(2)} ₺, Toplam Gider: ${totalExpense.toFixed(2)} ₺, Net Kar/Zarar: ${(totalIncome - totalExpense).toFixed(2)} ₺`;
   }
@@ -293,52 +446,54 @@
 
   filterBtn.addEventListener('click', applyFilter);
 
-  // PDF indir butonu fonksiyonu için jsPDF kullanacağız
-  // jsPDF CDN eklemediğimiz için buraya basit bir dışa aktarma fonksiyonu yazalım:
-
   exportPdfBtn.addEventListener('click', () => {
-    if (entries.length === 0) {
-      showError('PDF oluşturmak için kayıt yok.');
-      return;
-    }
-    let content = `Gelir Gider Raporu\n\n`;
-    content += `Tür\tKategori\tAlt Kategori\tTutar (₺)\n`;
-
     const start = startDateInput.value;
     const end = endDateInput.value;
     const filtered = entries.filter(e => isDateBetween(e.date, start, end));
+    if (filtered.length === 0) {
+      showError('PDF oluşturmak için kayıt yok.');
+      return;
+    }
 
-    filtered.forEach(e => {
-      content += `${e.type}\t${e.category}\t${e.subcategory || '-'}\t${e.amount.toFixed(2)}\n`;
+    const aggregated = {};
+    filtered.forEach(entry => {
+      const key = `${entry.type}|${entry.category}`;
+      if (!aggregated[key]) aggregated[key] = 0;
+      aggregated[key] += entry.amount;
     });
 
-    let totalIncome = 0;
-    let totalExpense = 0;
-    filtered.forEach(e => {
-      if (e.type === 'gelir') totalIncome += e.amount;
-      else totalExpense += e.amount;
-    });
-
+    let content = `Gelir Gider Raporu\n\n`;
+    content += `Tür\tKategori\tTutar (₺)\n`;
+    let totalIncome = 0, totalExpense = 0;
+    for (const key in aggregated) {
+      const [type, category] = key.split('|');
+      const amount = aggregated[key];
+      content += `${type}\t${category}\t${amount.toFixed(2)}\n`;
+      if (type === 'gelir') totalIncome += amount;
+      else totalExpense += amount;
+    }
     content += `\nToplam Gelir: ${totalIncome.toFixed(2)} ₺\n`;
     content += `Toplam Gider: ${totalExpense.toFixed(2)} ₺\n`;
     content += `Net Kar/Zarar: ${(totalIncome - totalExpense).toFixed(2)} ₺\n`;
 
-    // Basit olarak TXT formatında indirme yapacağız:
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'gelir-gider-raporu.txt';
-    link.click();
-    URL.revokeObjectURL(link.href);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `GelirGiderRapor_${start || 'baslangic'}_${end || 'bitis'}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   });
 
-  // Sayfa yüklendiğinde
-  window.onload = () => {
-    loadCategories();
-    categorySelect.dispatchEvent(new Event('change'));
-    dateInput.value = new Date().toISOString().substring(0,10);
-    applyFilter();
-  };
+  // Sayfa yüklendiğinde varsayılan değerler
+  dateInput.value = new Date().toISOString().substring(0,10);
+  startDateInput.value = '';
+  endDateInput.value = '';
+
+  loadCategories();
+  applyFilter();
 </script>
 
 </body>
