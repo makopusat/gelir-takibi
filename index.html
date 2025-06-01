@@ -10,13 +10,13 @@
       background: #f7f9fc;
       color: #333;
     }
-    h2 {
+    h2, h3, h4 {
       text-align: center;
       color: #2c3e50;
     }
     .container {
       max-width: 600px;
-      margin: 0 auto;
+      margin: 0 auto 30px auto;
       background: white;
       padding: 20px;
       border-radius: 10px;
@@ -91,6 +91,20 @@
     .flex-buttons button {
       width: 50%;
     }
+    .filter-dates {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    .filter-dates label {
+      flex: 1;
+      font-weight: normal;
+      margin-top: 0;
+    }
+    .filter-dates input[type="date"] {
+      flex: 2;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
@@ -151,15 +165,22 @@
       <button id="deleteSelectedBtn" class="delete">Sil</button>
     </div>
 
-    <h4>Toplam Gelir: <span id="totalIncome">0.00</span> TL</h4>
-    <h4>Toplam Gider: <span id="totalExpense">0.00</span> TL</h4>
-    <h4>Toplam Kar: <span id="totalProfit">0.00</span> TL</h4>
+    <div class="filter-dates">
+      <label for="startDate">Başlangıç Tarihi:</label>
+      <input type="date" id="startDate" />
+      <label for="endDate">Bitiş Tarihi:</label>
+      <input type="date" id="endDate" />
+    </div>
+    <button id="filterBtn">Filtrele</button>
+
+    <h4>Filtreli Toplam Gelir: <span id="filteredIncome">0.00</span> TL</h4>
+    <h4>Filtreli Toplam Gider: <span id="filteredExpense">0.00</span> TL</h4>
+    <h4>Filtreli Toplam Kar: <span id="filteredProfit">0.00</span> TL</h4>
 
     <button id="logoutBtn" style="background:#95a5a6; margin-top: 30px;">Çıkış Yap</button>
   </div>
 
   <script type="module">
-    // Firebase imports (CDN or npm)
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
     import {
       getAuth,
@@ -169,7 +190,6 @@
       signOut,
     } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
 
-    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyCTZXqmpVQeYwm2PoDwEYih9vDDl3A5rtI",
       authDomain: "gelir-gider-d3dc3.firebaseapp.com",
@@ -210,12 +230,21 @@
     const editSelectedBtn = document.getElementById("editSelectedBtn");
     const deleteSelectedBtn = document.getElementById("deleteSelectedBtn");
 
+    // Filter elements
+    const startDateEl = document.getElementById("startDate");
+    const endDateEl = document.getElementById("endDate");
+    const filterBtn = document.getElementById("filterBtn");
+
+    // Result elements
+    const filteredIncomeEl = document.getElementById("filteredIncome");
+    const filteredExpenseEl = document.getElementById("filteredExpense");
+    const filteredProfitEl = document.getElementById("filteredProfit");
+
     // Data
     let transactions = [];
     let subcategories = { Gelir: [], Gider: [] };
     let selectedIndex = null;
 
-    // Load data from localStorage if exists
     function loadData() {
       const t = localStorage.getItem("transactions");
       const s = localStorage.getItem("subcategories");
@@ -223,159 +252,198 @@
       subcategories = s ? JSON.parse(s) : { Gelir: [], Gider: [] };
     }
 
-    // Save data to localStorage
     function saveData() {
       localStorage.setItem("transactions", JSON.stringify(transactions));
       localStorage.setItem("subcategories", JSON.stringify(subcategories));
     }
 
-    // Update subcategory dropdown
     function updateSubcategoryOptions() {
       const type = typeEl.value;
       subcategoryEl.innerHTML = "";
-      subcategories[type].forEach((sub) => {
-        const opt = document.createElement("option");
-        opt.value = sub;
-        opt.textContent = sub;
-        subcategoryEl.appendChild(opt);
-      });
-      if (subcategoryEl.options.length === 0) {
-        const opt = document.createElement("option");
-        opt.value = "";
-        opt.textContent = "-- Alt kategori yok, ekleyin --";
-        subcategoryEl.appendChild(opt);
+      // Alt kategoriler boş gelebilir
+      const options = subcategories[type] || [];
+      if (options.length === 0) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "(Alt kategori yok)";
+        subcategoryEl.appendChild(option);
+      } else {
+        options.forEach((sc) => {
+          const option = document.createElement("option");
+          option.value = sc;
+          option.textContent = sc;
+          subcategoryEl.appendChild(option);
+        });
       }
     }
 
-    // Add new subcategory
+    function updateUI() {
+      // Liste güncelle
+      transactionListEl.innerHTML = "";
+      transactions.forEach((tx, i) => {
+        const option = document.createElement("option");
+        option.value = i;
+        option.textContent = `${tx.date} - ${tx.type} - ${tx.subcategory} - ${tx.amount.toFixed(2)} TL - ${tx.description}`;
+        transactionListEl.appendChild(option);
+      });
+
+      // Form reset
+      transactionForm.reset();
+      updateSubcategoryOptions();
+
+      // Seçim sıfırla
+      selectedIndex = null;
+      addBtn.classList.remove("hidden");
+      editBtn.classList.add("hidden");
+
+      // Toplamlar
+      const incomeTotal = transactions
+        .filter((t) => t.type === "Gelir")
+        .reduce((a, b) => a + b.amount, 0);
+      const expenseTotal = transactions
+        .filter((t) => t.type === "Gider")
+        .reduce((a, b) => a + b.amount, 0);
+      // Kar = Gelir - Gider
+      const profit = incomeTotal - expenseTotal;
+
+      filteredIncomeEl.textContent = incomeTotal.toFixed(2);
+      filteredExpenseEl.textContent = expenseTotal.toFixed(2);
+      filteredProfitEl.textContent = profit.toFixed(2);
+    }
+
+    // Filtreli toplam hesapla ve göster
+    function filterAndCalculate() {
+      const startDate = startDateEl.value ? new Date(startDateEl.value) : null;
+      const endDate = endDateEl.value ? new Date(endDateEl.value) : null;
+
+      const filtered = transactions.filter((tx) => {
+        const txDate = new Date(tx.date);
+        if (startDate && txDate < startDate) return false;
+        if (endDate && txDate > endDate) return false;
+        return true;
+      });
+
+      const incomeSum = filtered
+        .filter((t) => t.type === "Gelir")
+        .reduce((a, b) => a + b.amount, 0);
+      const expenseSum = filtered
+        .filter((t) => t.type === "Gider")
+        .reduce((a, b) => a + b.amount, 0);
+      const profitSum = incomeSum - expenseSum;
+
+      filteredIncomeEl.textContent = incomeSum.toFixed(2);
+      filteredExpenseEl.textContent = expenseSum.toFixed(2);
+      filteredProfitEl.textContent = profitSum.toFixed(2);
+    }
+
+    // Events
     addSubcategoryBtn.addEventListener("click", () => {
       const type = typeEl.value;
       const newSub = newSubcategoryEl.value.trim();
-      if (!newSub) {
-        alert("Alt kategori boş olamaz!");
-        return;
-      }
-      if (!subcategories[type].includes(newSub)) {
-        subcategories[type].push(newSub);
-        saveData();
-        updateSubcategoryOptions();
-        newSubcategoryEl.value = "";
-        subcategoryEl.value = newSub;
-      } else {
-        alert("Bu alt kategori zaten mevcut.");
-      }
+      if (!newSub) return alert("Yeni alt kategori boş olamaz!");
+      if (!subcategories[type]) subcategories[type] = [];
+      if (subcategories[type].includes(newSub))
+        return alert("Bu alt kategori zaten var.");
+      subcategories[type].push(newSub);
+      saveData();
+      updateSubcategoryOptions();
+      newSubcategoryEl.value = "";
+      alert("Alt kategori eklendi.");
     });
 
-    // Update transaction list UI
-    function updateUI() {
-      transactionListEl.innerHTML = "";
-      let totalIncome = 0;
-      let totalExpense = 0;
-
-      transactions.forEach((t, i) => {
-        const option = document.createElement("option");
-        option.value = i;
-        option.text = `${t.date} - ${t.type}: ${t.amount.toFixed(2)} TL - ${t.subcategory} - ${t.description}`;
-        transactionListEl.appendChild(option);
-        if (t.type === "Gelir") totalIncome += t.amount;
-        else totalExpense += t.amount;
-      });
-
-      document.getElementById("totalIncome").textContent = totalIncome.toFixed(2);
-      document.getElementById("totalExpense").textContent = totalExpense.toFixed(2);
-      document.getElementById("totalProfit").textContent = (totalIncome - totalExpense).toFixed(2);
-
-      updateSubcategoryOptions();
-    }
-
-    // Add new transaction
     transactionForm.addEventListener("submit", (e) => {
       e.preventDefault();
+      const type = typeEl.value;
+      const subcategory = subcategoryEl.value;
+      const amount = parseFloat(amountEl.value);
+      const description = descriptionEl.value.trim();
+      const date = dateEl.value;
 
-      const newTransaction = {
-        type: typeEl.value,
-        subcategory: subcategoryEl.value,
-        amount: parseFloat(amountEl.value),
-        description: descriptionEl.value,
-        date: dateEl.value,
-      };
-
-      // Validate subcategory
-      if (!newTransaction.subcategory) {
-        alert("Lütfen geçerli bir alt kategori seçin.");
+      if (!subcategory) {
+        alert("Alt kategori seçmelisiniz.");
+        return;
+      }
+      if (isNaN(amount) || amount <= 0) {
+        alert("Tutar sıfırdan büyük olmalı.");
+        return;
+      }
+      if (!description) {
+        alert("Açıklama boş olamaz.");
+        return;
+      }
+      if (!date) {
+        alert("Tarih seçmelisiniz.");
         return;
       }
 
       if (selectedIndex === null) {
-        transactions.push(newTransaction);
+        // Yeni ekle
+        transactions.push({ type, subcategory, amount, description, date });
       } else {
-        transactions[selectedIndex] = newTransaction;
-        selectedIndex = null;
-        addBtn.style.display = "block";
-        editBtn.classList.add("hidden");
+        // Düzenle
+        transactions[selectedIndex] = { type, subcategory, amount, description, date };
       }
-
       saveData();
-      transactionForm.reset();
       updateUI();
     });
 
-    // Edit selected transaction
     editSelectedBtn.addEventListener("click", () => {
       const selected = transactionListEl.selectedIndex;
       if (selected === -1) {
-        alert("Lütfen düzenlemek için bir işlem seçin.");
+        alert("Düzenlemek için işlem seçin.");
         return;
       }
-
       selectedIndex = selected;
-      const t = transactions[selectedIndex];
-
-      typeEl.value = t.type;
+      const tx = transactions[selectedIndex];
+      typeEl.value = tx.type;
       updateSubcategoryOptions();
-      subcategoryEl.value = t.subcategory;
-      amountEl.value = t.amount;
-      descriptionEl.value = t.description;
-      dateEl.value = t.date;
-
-      addBtn.style.display = "none";
+      subcategoryEl.value = tx.subcategory;
+      amountEl.value = tx.amount;
+      descriptionEl.value = tx.description;
+      dateEl.value = tx.date;
+      addBtn.classList.add("hidden");
       editBtn.classList.remove("hidden");
     });
 
-    // Save edited transaction
     editBtn.addEventListener("click", () => {
       transactionForm.dispatchEvent(new Event("submit"));
     });
 
-    // Delete selected transaction
     deleteSelectedBtn.addEventListener("click", () => {
       const selected = transactionListEl.selectedIndex;
       if (selected === -1) {
-        alert("Lütfen silmek için bir işlem seçin.");
+        alert("Silmek için işlem seçin.");
         return;
       }
       if (!confirm("Seçili işlemi silmek istediğinize emin misiniz?")) return;
-
       transactions.splice(selected, 1);
       saveData();
       updateUI();
     });
 
-    // Update subcategories when type changes
+    // Tür değişince alt kategori güncelle
     typeEl.addEventListener("change", () => {
       updateSubcategoryOptions();
     });
 
-    // Set date input max to today
-    dateEl.max = new Date().toISOString().split("T")[0];
-    dateEl.value = new Date().toISOString().split("T")[0];
+    // Tarih alanlarına max bugünü koy
+    const todayStr = new Date().toISOString().split("T")[0];
+    dateEl.max = todayStr;
+    dateEl.value = todayStr;
+    startDateEl.max = todayStr;
+    endDateEl.max = todayStr;
 
-    // Authentication
+    // Filtre butonu
+    filterBtn.addEventListener("click", () => {
+      filterAndCalculate();
+    });
 
+    // Auth işlemleri
     registerBtn.addEventListener("click", () => {
       const email = emailEl.value.trim();
       const password = passwordEl.value.trim();
       if (!email || !password) {
+        messageEl.style.color = "red";
         messageEl.textContent = "E-posta ve şifre gerekli!";
         return;
       }
@@ -394,6 +462,7 @@
       const email = emailEl.value.trim();
       const password = passwordEl.value.trim();
       if (!email || !password) {
+        messageEl.style.color = "red";
         messageEl.textContent = "E-posta ve şifre gerekli!";
         return;
       }
@@ -418,11 +487,11 @@
         welcomeEl.textContent = user.email + " olarak giriş yaptınız.";
         loadData();
         updateUI();
+        filterAndCalculate();
       } else {
         authContainer.classList.remove("hidden");
         appContainer.classList.add("hidden");
         messageEl.textContent = "";
-        transactionForm.reset();
         transactions = [];
         subcategories = { Gelir: [], Gider: [] };
         saveData();
