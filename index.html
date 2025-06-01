@@ -2,122 +2,140 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
-  <title>Gelir Gider Takip - Firebase Auth Örnek</title>
+  <title>Gelir Gider Takip - Firebase Auth ve Basit Ana Sayfa</title>
   <style>
-    /* Basit stiller */
-    body { font-family: Arial; padding: 20px; }
+    body { font-family: Arial, sans-serif; padding: 20px; }
     .hidden { display: none; }
-    button { margin-top: 10px; }
-    input, select { margin-top: 5px; display: block; }
-    #message { margin-top: 10px; height: 20px; }
+    button { margin-top: 10px; padding: 10px 20px; font-size: 16px; }
+    input { display: block; margin: 10px 0; padding: 8px; width: 300px; max-width: 100%; }
+    #message { height: 20px; margin-top: 10px; color: red; }
   </style>
 </head>
 <body>
 
-<h2>Giriş / Kayıt</h2>
-<div id="auth-section">
-  <input id="email" type="email" placeholder="E-posta" />
-  <input id="password" type="password" placeholder="Şifre" />
-  <button id="register-btn">Kayıt Ol</button>
-  <button id="login-btn">Giriş Yap</button>
-  <div id="message"></div>
-</div>
+  <h2>Giriş / Kayıt</h2>
+  <div id="auth-section">
+    <input id="email" type="email" placeholder="E-posta" />
+    <input id="password" type="password" placeholder="Şifre" />
+    <button id="register-btn">Kayıt Ol</button>
+    <button id="login-btn">Giriş Yap</button>
+    <div id="message"></div>
+  </div>
 
-<div id="app-section" class="hidden">
-  <h3>Hoşgeldiniz, <span id="user-email"></span></h3>
-  <button id="logout-btn">Çıkış Yap</button>
-  <!-- Buraya gelir-gider uygulamanızın ana bölümü gelecek -->
-</div>
+  <div id="app-section" class="hidden">
+    <h3>Hoşgeldiniz, <span id="user-email"></span></h3>
+    <button id="logout-btn">Çıkış Yap</button>
 
-<script type="module">
-  // Firebase modüllerini import et
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+    <!-- Basit gelir-gider bölümü örneği -->
+    <h4>Gelir-Gider Ana Sayfa</h4>
+    <p>Burada gelir-gider kayıtları ve işlemler yapılabilir.</p>
+    <button id="open-income-expense">Gelir-Gider Bölümüne Gir</button>
 
-  // Firebase config (senin verdiğin bilgileri buraya yapıştır)
-  const firebaseConfig = {
-    apiKey: "AIzaSyCTZXqmpVQeYwm2PoDwEYih9vDDl3A5rtI",
-    authDomain: "gelir-gider-d3dc3.firebaseapp.com",
-    projectId: "gelir-gider-d3dc3",
-    storageBucket: "gelir-gider-d3dc3.appspot.com",
-    messagingSenderId: "791363419549",
-    appId: "1:791363419549:web:724a349a5efcd6b7c30374",
-    measurementId: "G-B8NKY7SR14"
-  };
+    <div id="income-expense-section" class="hidden" style="margin-top:20px;">
+      <h5>Gelir Gider İşlemleri</h5>
+      <p>Buraya gelir-gider formu ve raporlar eklenecek.</p>
+      <button id="back-btn">Ana Sayfaya Dön</button>
+    </div>
+  </div>
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 
-  // Elementler
-  const emailInput = document.getElementById('email');
-  const passwordInput = document.getElementById('password');
-  const registerBtn = document.getElementById('register-btn');
-  const loginBtn = document.getElementById('login-btn');
-  const logoutBtn = document.getElementById('logout-btn');
-  const messageEl = document.getElementById('message');
-  const authSection = document.getElementById('auth-section');
-  const appSection = document.getElementById('app-section');
-  const userEmailEl = document.getElementById('user-email');
+    const firebaseConfig = {
+      apiKey: "AIzaSyCTZXqmpVQeYwm2PoDwEYih9vDDl3A5rtI",
+      authDomain: "gelir-gider-d3dc3.firebaseapp.com",
+      projectId: "gelir-gider-d3dc3",
+      storageBucket: "gelir-gider-d3dc3.appspot.com",
+      messagingSenderId: "791363419549",
+      appId: "1:791363419549:web:724a349a5efcd6b7c30374",
+      measurementId: "G-B8NKY7SR14"
+    };
 
-  function showMessage(msg, color='red') {
-    messageEl.style.color = color;
-    messageEl.textContent = msg;
-    setTimeout(() => messageEl.textContent = '', 4000);
-  }
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
 
-  registerBtn.addEventListener('click', () => {
-    const email = emailInput.value.trim();
-    const pass = passwordInput.value;
-    if(!email || !pass) {
-      showMessage('E-posta ve şifre gerekli.');
-      return;
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const registerBtn = document.getElementById('register-btn');
+    const loginBtn = document.getElementById('login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    const messageEl = document.getElementById('message');
+    const authSection = document.getElementById('auth-section');
+    const appSection = document.getElementById('app-section');
+    const userEmailEl = document.getElementById('user-email');
+
+    const openIncomeExpenseBtn = document.getElementById('open-income-expense');
+    const incomeExpenseSection = document.getElementById('income-expense-section');
+    const backBtn = document.getElementById('back-btn');
+
+    function showMessage(msg, color='red') {
+      messageEl.style.color = color;
+      messageEl.textContent = msg;
+      setTimeout(() => messageEl.textContent = '', 4000);
     }
-    createUserWithEmailAndPassword(auth, email, pass)
-      .then(userCredential => {
-        showMessage('Kayıt başarılı, giriş yapabilirsiniz.', 'green');
-      })
-      .catch(err => {
-        showMessage('Kayıt hatası: ' + err.message);
-      });
-  });
 
-  loginBtn.addEventListener('click', () => {
-    const email = emailInput.value.trim();
-    const pass = passwordInput.value;
-    if(!email || !pass) {
-      showMessage('E-posta ve şifre gerekli.');
-      return;
-    }
-    signInWithEmailAndPassword(auth, email, pass)
-      .then(userCredential => {
-        showMessage('Giriş başarılı!', 'green');
-        // Giriş başarılı olunca kullanıcı değişikliği onAuthStateChanged ile yakalanacak
-      })
-      .catch(err => {
-        showMessage('Giriş hatası: ' + err.message);
-      });
-  });
-
-  logoutBtn.addEventListener('click', () => {
-    signOut(auth).then(() => {
-      showMessage('Çıkış yapıldı.', 'green');
+    registerBtn.addEventListener('click', () => {
+      const email = emailInput.value.trim();
+      const pass = passwordInput.value;
+      if (!email || !pass) {
+        showMessage('E-posta ve şifre gerekli.');
+        return;
+      }
+      createUserWithEmailAndPassword(auth, email, pass)
+        .then(() => {
+          showMessage('Kayıt başarılı, giriş yapabilirsiniz.', 'green');
+        })
+        .catch(err => {
+          showMessage('Kayıt hatası: ' + err.message);
+        });
     });
-  });
 
-  onAuthStateChanged(auth, (user) => {
-    if(user) {
-      authSection.classList.add('hidden');
-      appSection.classList.remove('hidden');
-      userEmailEl.textContent = user.email;
-      // Burada kullanıcı giriş yaptıktan sonra gelir-gider ana işlemlerini başlatabilirsin
-    } else {
-      authSection.classList.remove('hidden');
-      appSection.classList.add('hidden');
-      emailInput.value = '';
-      passwordInput.value = '';
-    }
-  });
-</script>
+    loginBtn.addEventListener('click', () => {
+      const email = emailInput.value.trim();
+      const pass = passwordInput.value;
+      if (!email || !pass) {
+        showMessage('E-posta ve şifre gerekli.');
+        return;
+      }
+      signInWithEmailAndPassword(auth, email, pass)
+        .then(() => {
+          showMessage('Giriş başarılı!', 'green');
+        })
+        .catch(err => {
+          showMessage('Giriş hatası: ' + err.message);
+        });
+    });
 
+    logoutBtn.addEventListener('click', () => {
+      signOut(auth).then(() => {
+        showMessage('Çıkış yapıldı.', 'green');
+      });
+    });
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        authSection.classList.add('hidden');
+        appSection.classList.remove('hidden');
+        userEmailEl.textContent = user.email;
+
+        // Gelir-gider bölümü kapalı olsun başlangıçta
+        incomeExpenseSection.classList.add('hidden');
+      } else {
+        authSection.classList.remove('hidden');
+        appSection.classList.add('hidden');
+        emailInput.value = '';
+        passwordInput.value = '';
+      }
+    });
+
+    openIncomeExpenseBtn.addEventListener('click', () => {
+      incomeExpenseSection.classList.remove('hidden');
+    });
+
+    backBtn.addEventListener('click', () => {
+      incomeExpenseSection.classList.add('hidden');
+    });
+  </script>
 </body>
 </html>
