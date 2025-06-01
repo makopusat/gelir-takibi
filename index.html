@@ -61,6 +61,7 @@
       background-color: #2e5a8a;
       box-shadow: 0 2px 6px rgba(46, 90, 138, 0.9);
     }
+    /* Sil butonu için özel renk */
     button[style*="background:red"] {
       background-color: #e74c3c !important;
       box-shadow: 0 4px 8px rgba(231, 76, 60, 0.4);
@@ -74,6 +75,7 @@
       background-color: #922b21 !important;
       box-shadow: 0 2px 6px rgba(146, 43, 33, 0.9);
     }
+
     .section {
       margin-bottom: 30px; 
       border: 1px solid #ddd; 
@@ -102,17 +104,18 @@
       margin-top: 10px;
       justify-content: center;
     }
+    /* Yazdırma için tablo stilleri */
     table {
       width: 100%;
       border-collapse: collapse;
       margin-bottom: 15px;
     }
     table, th, td {
-      border: 1px solid #ccc;
+      border: 1px solid #bbb;
     }
     th, td {
-      padding: 8px 12px;
-      text-align: center;
+      padding: 8px;
+      text-align: left;
     }
     th {
       background-color: #5b9bd5;
@@ -123,7 +126,45 @@
 <body>
   <div class="container">
     <h2>Gelir/Gider Takip Sistemi</h2>
-    <!-- ... önceki form ve liste bölümü aynı ... -->
+
+    <div class="section">
+      <form id="transactionForm">
+        <label for="type">Tür:</label>
+        <select id="type" required>
+          <option value="Gelir">Gelir</option>
+          <option value="Gider">Gider</option>
+        </select>
+
+        <label for="subcategory">Alt Kategori:</label>
+        <select id="subcategory" required></select>
+        <input type="text" id="newSubcategory" placeholder="Yeni Alt Kategori Ekle" />
+        <button type="button" onclick="addSubcategory()">Alt Kategori Ekle</button>
+
+        <label for="amount">Tutar:</label>
+        <input type="number" id="amount" step="0.01" min="0" required />
+
+        <label for="description">Açıklama:</label>
+        <input type="text" id="description" required />
+
+        <label for="date">Tarih:</label>
+        <input type="date" id="date" required />
+
+        <button type="submit" id="addBtn">Ekle</button>
+        <button type="button" id="editBtn" style="display: none;">Kaydet</button>
+      </form>
+    </div>
+
+    <div class="section">
+      <h3>İşlem Listesi</h3>
+      <select id="transactionList" size="8"></select>
+      <div class="btn-group">
+        <button onclick="editSelected()">Düzenle</button>
+        <button onclick="deleteSelected()" style="background:red;">Sil</button>
+      </div>
+      <h4>Toplam Gelir: <span id="totalIncome">0</span> TL</h4>
+      <h4>Toplam Gider: <span id="totalExpense">0</span> TL</h4>
+      <h4>Toplam Kar: <span id="totalProfit">0</span> TL</h4>
+    </div>
 
     <div class="section">
       <h3>Raporlama</h3>
@@ -138,19 +179,9 @@
 
       <div id="reportOutput">
         <h4>Gelirler:</h4>
-        <table id="incomeTable">
-          <thead>
-            <tr><th>Alt Kategori</th><th>Tutar (TL)</th></tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <ul id="filteredIncome"></ul>
         <h4>Giderler:</h4>
-        <table id="expenseTable">
-          <thead>
-            <tr><th>Alt Kategori</th><th>Tutar (TL)</th></tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <ul id="filteredExpense"></ul>
 
         <h4>Filtrelenmiş Gelir: <span id="filteredTotalIncome">0</span> TL</h4>
         <h4>Filtrelenmiş Gider: <span id="filteredTotalExpense">0</span> TL</h4>
@@ -160,8 +191,143 @@
   </div>
 
   <script>
-    // ... diğer kodlar aynı, sadece raporlama ile ilgili kısımlar aşağıda ...
+    let transactions = JSON.parse(localStorage.getItem("transactions")) || [];
+    let subcategories = JSON.parse(localStorage.getItem("subcategories")) || { Gelir: [], Gider: [] };
+    let selectedIndex = null;
 
+    const typeEl = document.getElementById("type");
+    const subcategoryEl = document.getElementById("subcategory");
+
+    typeEl.addEventListener("change", updateSubcategoryOptions);
+
+    function updateSubcategoryOptions() {
+      const type = typeEl.value;
+      subcategoryEl.innerHTML = "";
+
+      if (subcategories[type].length === 0) {
+        if (type === "Gelir") {
+          subcategories[type].push("Diğer Gelir");
+        } else {
+          subcategories[type].push("Fatura");
+        }
+        localStorage.setItem("subcategories", JSON.stringify(subcategories));
+      }
+
+      subcategories[type].forEach(sub => {
+        if(sub.toLowerCase() === "maaş") return;
+        const opt = document.createElement("option");
+        opt.value = sub;
+        opt.textContent = sub;
+        subcategoryEl.appendChild(opt);
+      });
+    }
+
+    function addSubcategory() {
+      const type = typeEl.value;
+      const newSub = document.getElementById("newSubcategory").value.trim();
+      if (!newSub) return alert("Alt kategori boş olamaz.");
+
+      if (newSub.toLowerCase() === "maaş") {
+        alert('"Maaş" alt kategorisi eklenemez.');
+        return;
+      }
+
+      if (!subcategories[type].includes(newSub)) {
+        subcategories[type].push(newSub);
+        localStorage.setItem("subcategories", JSON.stringify(subcategories));
+        updateSubcategoryOptions();
+      }
+      document.getElementById("newSubcategory").value = "";
+    }
+
+    function updateUI() {
+      const list = document.getElementById("transactionList");
+      list.innerHTML = "";
+
+      let totalIncome = 0;
+      let totalExpense = 0;
+
+      transactions.forEach((t, i) => {
+        if(t.subcategory.toLowerCase() === "maaş") return;
+        const option = document.createElement("option");
+        option.value = i;
+        option.text = `${t.date} - ${t.type}: ${t.amount.toFixed(2)} TL - ${t.subcategory} - ${t.description}`;
+        list.appendChild(option);
+        if (t.type === "Gelir") totalIncome += t.amount;
+        else totalExpense += t.amount;
+      });
+
+      document.getElementById("totalIncome").textContent = totalIncome.toFixed(2);
+      document.getElementById("totalExpense").textContent = totalExpense.toFixed(2);
+      document.getElementById("totalProfit").textContent = (totalIncome - totalExpense).toFixed(2);
+      updateSubcategoryOptions();
+    }
+
+    document.getElementById("transactionForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+
+      const newTransaction = {
+        type: typeEl.value,
+        subcategory: subcategoryEl.value,
+        amount: parseFloat(document.getElementById("amount").value),
+        description: document.getElementById("description").value,
+        date: document.getElementById("date").value
+      };
+
+      if (newTransaction.subcategory.toLowerCase() === "maaş") {
+        alert('"Maaş" alt kategorisi kullanılamaz.');
+        return;
+      }
+
+      if (selectedIndex === null) {
+        transactions.push(newTransaction);
+      } else {
+        transactions[selectedIndex] = newTransaction;
+        selectedIndex = null;
+        document.getElementById("addBtn").style.display = "inline-block";
+        document.getElementById("editBtn").style.display = "none";
+      }
+
+      localStorage.setItem("transactions", JSON.stringify(transactions));
+      this.reset();
+      updateUI();
+    });
+
+    function editSelected() {
+      const list = document.getElementById("transactionList");
+      if (list.selectedIndex === -1) return alert("Düzenlemek için bir işlem seçiniz.");
+
+      selectedIndex = parseInt(list.value);
+      const t = transactions[selectedIndex];
+
+      typeEl.value = t.type;
+      updateSubcategoryOptions();
+      subcategoryEl.value = t.subcategory;
+      document.getElementById("amount").value = t.amount;
+      document.getElementById("description").value = t.description;
+      document.getElementById("date").value = t.date;
+
+      document.getElementById("addBtn").style.display = "none";
+      document.getElementById("editBtn").style.display = "inline-block";
+    }
+
+    document.getElementById("editBtn").addEventListener("click", () => {
+      document.getElementById("transactionForm").dispatchEvent(new Event('submit'));
+    });
+
+    function deleteSelected() {
+      const list = document.getElementById("transactionList");
+      if (list.selectedIndex === -1) return alert("Silmek için bir işlem seçiniz.");
+
+      const idx = parseInt(list.value);
+      if (!confirm("Seçilen işlemi silmek istediğinize emin misiniz?")) return;
+
+      transactions.splice(idx, 1);
+      localStorage.setItem("transactions", JSON.stringify(transactions));
+      updateUI();
+    }
+
+    // Filtreleme ve raporlama fonksiyonu (tablo şeklinde)
     function filterByDate() {
       const start = document.getElementById("startDate").value;
       const end = document.getElementById("endDate").value;
@@ -188,61 +354,52 @@
         }
       });
 
-      const incomeTbody = document.querySelector("#incomeTable tbody");
-      const expenseTbody = document.querySelector("#expenseTable tbody");
+      // Rapor bölümünü tabloya çevir
+      const reportDiv = document.getElementById("reportOutput");
+      reportDiv.innerHTML = `
+        <h4>Gelirler:</h4>
+        <table border="1" cellspacing="0" cellpadding="5" style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr><th>Alt Kategori</th><th>Tutar (TL)</th></tr>
+          </thead>
+          <tbody>
+            ${Object.entries(incomeGrouped).map(([key,val]) => 
+              `<tr><td>${key}</td><td>${val.toFixed(2)}</td></tr>`).join("")}
+          </tbody>
+        </table>
 
-      incomeTbody.innerHTML = "";
-      expenseTbody.innerHTML = "";
+        <h4>Giderler:</h4>
+        <table border="1" cellspacing="0" cellpadding="5" style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr><th>Alt Kategori</th><th>Tutar (TL)</th></tr>
+          </thead>
+          <tbody>
+            ${Object.entries(expenseGrouped).map(([key,val]) => 
+              `<tr><td>${key}</td><td>${val.toFixed(2)}</td></tr>`).join("")}
+          </tbody>
+        </table>
 
-      for (let key in incomeGrouped) {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td>${key}</td><td>${incomeGrouped[key].toFixed(2)}</td>`;
-        incomeTbody.appendChild(tr);
-      }
-      for (let key in expenseGrouped) {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td>${key}</td><td>${expenseGrouped[key].toFixed(2)}</td>`;
-        expenseTbody.appendChild(tr);
-      }
-
-      document.getElementById("filteredTotalIncome").textContent = totalIncome.toFixed(2);
-      document.getElementById("filteredTotalExpense").textContent = totalExpense.toFixed(2);
-      document.getElementById("filteredProfit").textContent = (totalIncome - totalExpense).toFixed(2);
+        <h4>Filtrelenmiş Gelir: <span id="filteredTotalIncome">${totalIncome.toFixed(2)}</span> TL</h4>
+        <h4>Filtrelenmiş Gider: <span id="filteredTotalExpense">${totalExpense.toFixed(2)}</span> TL</h4>
+        <h4>Filtrelenmiş Kar: <span id="filteredProfit">${(totalIncome - totalExpense).toFixed(2)}</span> TL</h4>
+      `;
     }
 
     function printReport() {
-      const start = document.getElementById("startDate").value;
-      const end = document.getElementById("endDate").value;
-      if (!start || !end) return alert("Lütfen rapor için başlangıç ve bitiş tarihlerini seçiniz.");
-
-      const reportContent = `
-        <h2>Gelir/Gider Raporu</h2>
-        <p>${start} - ${end} tarihleri arası</p>
-        ${document.getElementById("reportOutput").innerHTML}
-      `;
-
-      const newWin = window.open("");
-      newWin.document.write(`
-        <html>
-          <head>
-            <title>Rapor</title>
-            <style>
-              body { font-family: Arial, sans-serif; padding: 20px; }
-              table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-              th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: center; }
-              th { background-color: #5b9bd5; color: white; }
-              h2, p { text-align: center; }
-            </style>
-          </head>
-          <body onload="window.print(); window.close();">
-            ${reportContent}
-          </body>
-        </html>
-      `);
-      newWin.document.close();
+      const reportContent = document.getElementById("reportOutput").innerHTML;
+      if (!reportContent.trim()) return alert("Önce rapor oluşturun.");
+      const printWindow = window.open("", "", "width=900,height=650");
+      printWindow.document.write("<html><head><title>Rapor</title>");
+      printWindow.document.write("<style>body{font-family: Arial, sans-serif; padding: 20px;} table{width:100%;border-collapse: collapse;} th,td{border:1px solid #bbb;padding:8px;text-align:left;} th{background:#5b9bd5;color:#fff;}</style>");
+      printWindow.document.write("</head><body>");
+      printWindow.document.write(reportContent);
+      printWindow.document.write("</body></html>");
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
     }
 
-    // İlk sayfa yüklenince subcategory ve listeyi güncelle
     updateUI();
   </script>
 </body>
