@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Gelir Gider Takip - Firebase Auth + Kategori + Rapor</title>
+<title>Gelir Gider Takip - Firebase Auth + Alt Kategori Seçimi</title>
 <style>
   body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f0f2f5; }
   header { background: #4a90e2; color: white; padding: 1rem; text-align: center; }
@@ -29,12 +29,10 @@
   .error { background-color: #f8d7da; color: #721c24; }
 </style>
 
-<!-- Firebase -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
 
-  // Firebase config
   const firebaseConfig = {
     apiKey: "AIzaSyCTZXqmpVQeYwm2PoDwEYih9vDDl3A5rtI",
     authDomain: "gelir-gider-d3dc3.firebaseapp.com",
@@ -47,7 +45,7 @@
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
 
-  // Elements
+  // DOM Elements
   const loginSection = document.getElementById('loginSection');
   const appSection = document.getElementById('appSection');
   const messageDiv = document.getElementById('message');
@@ -59,12 +57,15 @@
   const btnRegister = document.getElementById('btnRegister');
   const btnLogout = document.getElementById('btnLogout');
 
-  // Gelir-Gider form elemanları
   const typeSelect = document.getElementById('type');
   const categorySelect = document.getElementById('categorySelect');
   const addCategoryInput = document.getElementById('addCategoryInput');
   const addCategoryBtn = document.getElementById('addCategoryBtn');
-  const subcategoryInput = document.getElementById('subcategory');
+
+  const subcategorySelect = document.getElementById('subcategorySelect');
+  const addSubcategoryInput = document.getElementById('addSubcategoryInput');
+  const addSubcategoryBtn = document.getElementById('addSubcategoryBtn');
+
   const amountInput = document.getElementById('amount');
   const descriptionInput = document.getElementById('description');
   const dateInput = document.getElementById('date');
@@ -78,14 +79,20 @@
   const endDateInput = document.getElementById('endDate');
   const filterBtn = document.getElementById('filterBtn');
 
-  // Kategoriler
+  // Veri yapıları
   let categories = ['Maaş', 'Kira', 'Market', 'Elektrik'];
   let selectedCategories = new Set();
 
-  // Gelir-Gider kayıtları
-  let entries = [];
+  // Alt kategoriler obje şeklinde kategori bazında saklanacak
+  // { 'Maaş': ['Bonus', 'Aylık'], 'Kira': ['Ev', 'İşyeri'] }
+  let subcategoriesByCategory = {
+    'Maaş': ['Bonus', 'Aylık'],
+    'Kira': ['Ev', 'İşyeri'],
+    'Market': [],
+    'Elektrik': []
+  };
 
-  // --- Yardımcı fonksiyonlar ---
+  let entries = [];
 
   function showMessage(text) {
     messageDiv.textContent = text;
@@ -101,7 +108,7 @@
     setTimeout(() => { errorDiv.style.display = 'none'; }, 4000);
   }
 
-  // Kategori dropdown’ı yenile
+  // Kategori dropdown yenile
   function loadCategories() {
     categorySelect.innerHTML = '<option value="">Seçiniz...</option>';
     categories.forEach(cat => {
@@ -114,19 +121,30 @@
     });
   }
 
-  // Seçilen kategoriyi dropdown’dan çıkar
+  // Alt kategori dropdown yenile (seçili kategoriye göre)
+  function loadSubcategories(cat) {
+    subcategorySelect.innerHTML = '<option value="">(Alt kategori seçiniz veya yeni ekleyin)</option>';
+    if (!cat || !subcategoriesByCategory[cat]) return;
+    subcategoriesByCategory[cat].forEach(sub => {
+      const opt = document.createElement('option');
+      opt.value = sub;
+      opt.textContent = sub;
+      subcategorySelect.appendChild(opt);
+    });
+  }
+
+  // Seçilen kategoriyi set’e ekle, dropdown’dan çıkar
   function addSelectedCategory(cat) {
     selectedCategories.add(cat);
     loadCategories();
   }
 
-  // Kategoriyi silme ve dropdown’a geri ekleme
   function removeSelectedCategory(cat) {
     selectedCategories.delete(cat);
     loadCategories();
   }
 
-  // Girilen tarihleri YYYY-MM-DD formatında karşılaştırma
+  // Tarih aralığında kontrol
   function isDateBetween(date, start, end) {
     if (!start && !end) return true;
     const d = new Date(date);
@@ -135,7 +153,7 @@
     return true;
   }
 
-  // Raporlama fonksiyonu (kategori+alt kategori+tip bazında toplayarak)
+  // Raporlama
   function displayEntries(filteredEntries) {
     if (filteredEntries.length === 0) {
       entriesTable.style.display = 'none';
@@ -143,17 +161,18 @@
       return;
     }
 
-    // Gruplama için nesne
+    // Grup: tür|kategori|altkategori
     const grouped = {};
 
     filteredEntries.forEach(entry => {
-      const key = `${entry.type}|${entry.category}|${entry.subcategory || '-'}`;
+      const sub = entry.subcategory || '-';
+      const key = `${entry.type}|${entry.category}|${sub}`;
 
       if (!grouped[key]) {
         grouped[key] = {
           type: entry.type,
           category: entry.category,
-          subcategory: entry.subcategory || '-',
+          subcategory: sub,
           amount: 0
         };
       }
@@ -180,141 +199,159 @@
       else totalExpense += entry.amount;
     });
 
-    const net = totalIncome - totalExpense;
-    totalsDiv.textContent = `Toplam Gelir: ₺${totalIncome.toFixed(2)} | Toplam Gider: ₺${totalExpense.toFixed(2)} | Net Kar/Zarar: ₺${net.toFixed(2)}`;
+    totalsDiv.textContent = `Toplam Gelir: ${totalIncome.toFixed(2)} ₺, Toplam Gider: ${totalExpense.toFixed(2)} ₺, Net Kar/Zarar: ${(totalIncome - totalExpense).toFixed(2)} ₺`;
   }
 
-  // --- Event Listeners ---
-
-  // Firebase Authentication state değişimi
-  onAuthStateChanged(auth, user => {
-    if (user) {
-      loginSection.style.display = 'none';
-      appSection.style.display = 'block';
-      loadCategories();
-      displayEntries(entries);
-      resetForm();
-    } else {
-      loginSection.style.display = 'block';
-      appSection.style.display = 'none';
-    }
-  });
-
-  // Giriş yap
-  btnLogin.addEventListener('click', () => {
-    const email = emailInput.value.trim();
-    const pass = passwordInput.value.trim();
-    if (!email || !pass) {
-      showError('Lütfen e-posta ve şifre giriniz.');
+  // Yeni kategori ekle (manuel)
+  addCategoryBtn.addEventListener('click', () => {
+    const newCat = addCategoryInput.value.trim();
+    if (!newCat) {
+      showError('Kategori adı boş olamaz!');
       return;
     }
-    signInWithEmailAndPassword(auth, email, pass)
+    if (categories.includes(newCat)) {
+      showError('Bu kategori zaten mevcut!');
+      return;
+    }
+    categories.push(newCat);
+    subcategoriesByCategory[newCat] = [];
+    loadCategories();
+    addCategoryInput.value = '';
+    showMessage('Kategori eklendi.');
+  });
+
+  // Yeni alt kategori ekle (manuel, seçili kategoriye)
+  addSubcategoryBtn.addEventListener('click', () => {
+    const newSub = addSubcategoryInput.value.trim();
+    const selectedCat = categorySelect.value;
+    if (!selectedCat) {
+      showError('Lütfen önce kategori seçin!');
+      return;
+    }
+    if (!newSub) {
+      showError('Alt kategori boş olamaz!');
+      return;
+    }
+    if (!subcategoriesByCategory[selectedCat]) {
+      subcategoriesByCategory[selectedCat] = [];
+    }
+    if (subcategoriesByCategory[selectedCat].includes(newSub)) {
+      showError('Bu alt kategori zaten mevcut!');
+      return;
+    }
+    subcategoriesByCategory[selectedCat].push(newSub);
+    loadSubcategories(selectedCat);
+    addSubcategoryInput.value = '';
+    showMessage('Alt kategori eklendi.');
+  });
+
+  // Kategori seçimi değişince alt kategorileri yenile
+  categorySelect.addEventListener('change', (e) => {
+    loadSubcategories(e.target.value);
+  });
+
+  // Giriş ekle
+  addEntryBtn.addEventListener('click', () => {
+    const type = typeSelect.value;
+    const category = categorySelect.value;
+    const subcategory = subcategorySelect.value || '';
+    const amount = parseFloat(amountInput.value);
+    const description = descriptionInput.value.trim();
+    const date = dateInput.value;
+
+    if (!type) {
+      showError('Lütfen gelir veya gider seçin.');
+      return;
+    }
+    if (!category) {
+      showError('Lütfen kategori seçin.');
+      return;
+    }
+    if (!amount || amount <= 0) {
+      showError('Lütfen geçerli bir tutar girin.');
+      return;
+    }
+    if (!date) {
+      showError('Lütfen tarih seçin.');
+      return;
+    }
+
+    entries.push({ type, category, subcategory, amount, description, date });
+    showMessage('Kayıt eklendi.');
+
+    // Alanları temizle
+    amountInput.value = '';
+    descriptionInput.value = '';
+    dateInput.value = '';
+
+    // Filtreye göre göster
+    applyFilter();
+  });
+
+  // Filtrele ve göster
+  function applyFilter() {
+    const start = startDateInput.value;
+    const end = endDateInput.value;
+    const filtered = entries.filter(e => isDateBetween(e.date, start, end));
+    displayEntries(filtered);
+  }
+
+  filterBtn.addEventListener('click', applyFilter);
+
+  // Firebase Auth işlemleri
+
+  btnLogin.addEventListener('click', () => {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value.trim();
+    if (!email || !password) {
+      showError('Email ve şifre boş olamaz!');
+      return;
+    }
+    signInWithEmailAndPassword(auth, email, password)
       .then(() => {
-        showMessage('Başarıyla giriş yapıldı.');
-        emailInput.value = '';
-        passwordInput.value = '';
+        showMessage('Giriş başarılı!');
       })
       .catch(err => showError('Giriş başarısız: ' + err.message));
   });
 
-  // Kayıt ol
   btnRegister.addEventListener('click', () => {
     const email = emailInput.value.trim();
-    const pass = passwordInput.value.trim();
-    if (!email || !pass) {
-      showError('Lütfen e-posta ve şifre giriniz.');
+    const password = passwordInput.value.trim();
+    if (!email || !password) {
+      showError('Email ve şifre boş olamaz!');
       return;
     }
-    createUserWithEmailAndPassword(auth, email, pass)
-      .then(() => {
-        showMessage('Kayıt başarılı, giriş yapabilirsiniz.');
-        emailInput.value = '';
-        passwordInput.value = '';
-      })
+    createUserWithEmailAndPassword(auth, email, password)
+      .then(() => showMessage('Kayıt başarılı! Giriş yapabilirsiniz.'))
       .catch(err => showError('Kayıt başarısız: ' + err.message));
   });
 
-  // Çıkış yap
   btnLogout.addEventListener('click', () => {
     signOut(auth).then(() => {
       showMessage('Çıkış yapıldı.');
     });
   });
 
-  // Yeni kategori ekle (manuel)
-  addCategoryBtn.addEventListener('click', () => {
-    const newCat = addCategoryInput.value.trim();
-    if (!newCat) {
-      showError('Kategori boş olamaz.');
-      return;
-    }
-    if (!categories.includes(newCat)) {
-      categories.push(newCat);
+  // Oturum durumu kontrolü
+  onAuthStateChanged(auth, user => {
+    if (user) {
+      loginSection.classList.add('hidden');
+      appSection.classList.remove('hidden');
       loadCategories();
-      addCategoryInput.value = '';
-      showMessage(`Kategori "${newCat}" eklendi.`);
+      applyFilter();
     } else {
-      showError('Bu kategori zaten mevcut.');
+      loginSection.classList.remove('hidden');
+      appSection.classList.add('hidden');
     }
   });
 
-  // Kategori seçildiğinde seçilen kategoriyi set’e ekle (seçilen kategori dropdown’dan çıkar)
-  categorySelect.addEventListener('change', () => {
-    const selected = categorySelect.value;
-    if (selected) {
-      addSelectedCategory(selected);
-    }
-  });
-
-  // Gelir/Gider ekle
-  addEntryBtn.addEventListener('click', () => {
-    const type = typeSelect.value;
-    const category = categorySelect.value;
-    const subcategory = subcategoryInput.value.trim();
-    const amount = parseFloat(amountInput.value);
-    const description = descriptionInput.value.trim();
-    const date = dateInput.value;
-
-    if (!type || !category) {
-      showError('Lütfen Gelir veya Gider ve Kategori seçiniz.');
-      return;
-    }
-    if (isNaN(amount) || amount <= 0) {
-      showError('Lütfen geçerli bir tutar giriniz.');
-      return;
-    }
-    if (!date) {
-      showError('Lütfen tarih seçiniz.');
-      return;
-    }
-
-    entries.push({ type, category, subcategory, amount, description, date });
-    addSelectedCategory(category);
-    showMessage('Girdi başarıyla eklendi.');
-
-    displayEntries(entries);
-    resetForm();
-  });
-
-  // Filtrele butonu
-  filterBtn.addEventListener('click', () => {
-    const start = startDateInput.value;
-    const end = endDateInput.value;
-
-    const filtered = entries.filter(e => isDateBetween(e.date, start, end));
-    displayEntries(filtered);
-  });
-
-  // Formu sıfırla
-  function resetForm() {
-    typeSelect.value = '';
-    // Kategori seçimi sıfırlanmayacak, çünkü seçilen kategori dropdown’dan çıkarılıyor.
-    subcategoryInput.value = '';
-    amountInput.value = '';
-    descriptionInput.value = '';
-    dateInput.value = '';
+  // Sayfa yüklendiğinde tarih default
+  window.onload = () => {
+    const today = new Date().toISOString().substring(0, 10);
+    dateInput.value = today;
+    startDateInput.value = '';
+    endDateInput.value = '';
   }
-
 </script>
 </head>
 <body>
@@ -324,82 +361,70 @@
 </header>
 
 <section id="loginSection">
-  <main>
-    <h2>Giriş Yap / Kayıt Ol</h2>
-    <label for="email">E-posta:</label>
-    <input id="email" type="email" placeholder="E-posta giriniz" />
-
-    <label for="password">Şifre:</label>
-    <input id="password" type="password" placeholder="Şifre giriniz" />
-
-    <button id="btnLogin">Giriş Yap</button>
-    <button id="btnRegister">Kayıt Ol</button>
-
-    <div id="message" class="message"></div>
-    <div id="errorMessage" class="message error"></div>
-  </main>
+  <h2>Giriş / Kayıt</h2>
+  <input type="email" id="email" placeholder="Email" />
+  <input type="password" id="password" placeholder="Şifre" />
+  <button id="btnLogin">Giriş Yap</button>
+  <button id="btnRegister">Kayıt Ol</button>
+  <div id="message" class="message"></div>
+  <div id="errorMessage" class="message error"></div>
 </section>
 
 <section id="appSection" class="hidden">
-  <main>
-    <button id="btnLogout" style="background-color:#e74c3c; margin-bottom: 20px;">Çıkış Yap</button>
+  <button id="btnLogout" style="float:right; margin-bottom: 10px;">Çıkış Yap</button>
 
-    <h2>Gelir / Gider Ekle</h2>
-    <label for="type">Tür:</label>
-    <select id="type">
-      <option value="">Seçiniz...</option>
-      <option value="gelir">Gelir</option>
-      <option value="gider">Gider</option>
-    </select>
+  <h2>Gelir/Gider Kaydı Ekle</h2>
+  <label for="type">Tür:</label>
+  <select id="type">
+    <option value="">Seçiniz...</option>
+    <option value="gelir">Gelir</option>
+    <option value="gider">Gider</option>
+  </select>
 
-    <label for="categorySelect">Kategori (Seçiniz veya yeni ekleyin):</label>
-    <select id="categorySelect">
-      <!-- Kategoriler buraya yüklenecek -->
-    </select>
+  <label for="categorySelect">Kategori Seç:</label>
+  <select id="categorySelect"></select>
 
-    <input id="addCategoryInput" type="text" placeholder="Yeni kategori ekle" />
-    <button id="addCategoryBtn" type="button">Kategori Ekle</button>
+  <label for="addCategoryInput">Yeni Kategori Ekle (manuel):</label>
+  <input type="text" id="addCategoryInput" placeholder="Yeni kategori adı" />
+  <button id="addCategoryBtn">Kategori Ekle</button>
 
-    <label for="subcategory">Alt Kategori (manuel yazınız):</label>
-    <input id="subcategory" type="text" placeholder="Alt kategori giriniz" />
+  <label for="subcategorySelect">Alt Kategori Seç:</label>
+  <select id="subcategorySelect"></select>
 
-    <label for="amount">Tutar:</label>
-    <input id="amount" type="number" step="0.01" placeholder="Tutar giriniz" />
+  <label for="addSubcategoryInput">Yeni Alt Kategori Ekle (manuel, seçili kategoriye):</label>
+  <input type="text" id="addSubcategoryInput" placeholder="Yeni alt kategori adı" />
+  <button id="addSubcategoryBtn">Alt Kategori Ekle</button>
 
-    <label for="description">Açıklama (opsiyonel):</label>
-    <input id="description" type="text" placeholder="Açıklama giriniz" />
+  <label for="amount">Tutar (₺):</label>
+  <input type="number" id="amount" min="0.01" step="0.01" />
 
-    <label for="date">Tarih:</label>
-    <input id="date" type="date" />
+  <label for="description">Açıklama (opsiyonel):</label>
+  <input type="text" id="description" />
 
-    <button id="addEntryBtn" type="button">Gelir/Gider Ekle</button>
+  <label for="date">Tarih:</label>
+  <input type="date" id="date" />
 
-    <h2>Raporlama</h2>
-    <label for="startDate">Başlangıç Tarihi:</label>
-    <input id="startDate" type="date" />
+  <button id="addEntryBtn">Kayıt Ekle</button>
 
-    <label for="endDate">Bitiş Tarihi:</label>
-    <input id="endDate" type="date" />
+  <h2>Raporlama</h2>
+  <label for="startDate">Başlangıç Tarihi:</label>
+  <input type="date" id="startDate" />
+  <label for="endDate">Bitiş Tarihi:</label>
+  <input type="date" id="endDate" />
+  <button id="filterBtn">Filtrele</button>
 
-    <button id="filterBtn" type="button">Filtrele</button>
-
-    <table id="entriesTable" style="display:none;">
-      <thead>
-        <tr>
-          <th>Tür</th>
-          <th>Kategori</th>
-          <th>Alt Kategori</th>
-          <th>Tutar (₺)</th>
-        </tr>
-      </thead>
-      <tbody id="entriesTbody"></tbody>
-    </table>
-
-    <div id="totals"></div>
-
-    <div id="message" class="message"></div>
-    <div id="errorMessage" class="message error"></div>
-  </main>
+  <table id="entriesTable" style="display:none;">
+    <thead>
+      <tr>
+        <th>Tür</th>
+        <th>Kategori</th>
+        <th>Alt Kategori</th>
+        <th>Tutar (₺)</th>
+      </tr>
+    </thead>
+    <tbody id="entriesTbody"></tbody>
+  </table>
+  <div id="totals"></div>
 </section>
 
 </body>
