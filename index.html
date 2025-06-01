@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Gelir/Gider Takip</title>
   <style>
     body { font-family: Arial; margin: 20px; }
@@ -23,7 +23,7 @@
       </select>
 
       <label for="amount">Tutar:</label>
-      <input type="number" id="amount" required>
+      <input type="number" id="amount" required min="0" step="0.01" />
 
       <label for="bank">Banka:</label>
       <select id="bank" required>
@@ -35,10 +35,10 @@
       </select>
 
       <label for="description">Açıklama:</label>
-      <input type="text" id="description" required>
+      <input type="text" id="description" required />
 
       <label for="date">Tarih:</label>
-      <input type="date" id="date" required>
+      <input type="date" id="date" required />
 
       <button type="submit" id="addBtn">Ekle</button>
       <button type="button" id="editBtn" style="display: none;">Kaydet</button>
@@ -49,21 +49,31 @@
     <h3>İşlem Listesi</h3>
     <select id="transactionList" size="8" style="width: 100%;"></select>
     <button onclick="editSelected()">Düzenle</button>
-    <button onclick="deleteSelected()" style="background:red;color:white;">Sil</button>
+    <button onclick="deleteSelected()" style="background:red; color:white;">Sil</button>
+
+    <h4>Toplam Gelir: <span id="totalIncome">0</span> TL</h4>
+    <h4>Toplam Gider: <span id="totalExpense">0</span> TL</h4>
     <h4>Toplam Kar: <span id="totalProfit">0</span> TL</h4>
   </div>
 
   <div class="section">
     <h3>Raporlama</h3>
     <label for="startDate">Başlangıç Tarihi:</label>
-    <input type="date" id="startDate">
+    <input type="date" id="startDate" />
 
     <label for="endDate">Bitiş Tarihi:</label>
-    <input type="date" id="endDate">
+    <input type="date" id="endDate" />
 
     <button onclick="filterByDate()">Raporla</button>
 
     <h4>Filtrelenmiş Toplam Kar: <span id="filteredProfit">0</span> TL</h4>
+
+    <!-- İstersen buraya filtrelenmiş gelir/gider toplamlarını ekleyebilirsin -->
+    <!--
+    <h4>Filtrelenmiş Toplam Gelir: <span id="filteredIncome">0</span> TL</h4>
+    <h4>Filtrelenmiş Toplam Gider: <span id="filteredExpense">0</span> TL</h4>
+    -->
+
     <ul id="filteredResults"></ul>
   </div>
 
@@ -75,17 +85,27 @@
       const list = document.getElementById("transactionList");
       list.innerHTML = "";
 
-      let total = 0;
+      let totalIncome = 0;
+      let totalExpense = 0;
 
       transactions.forEach((t, i) => {
         const option = document.createElement("option");
         option.value = i;
-        option.text = `${t.date} - ${t.type}: ${t.amount} TL - ${t.bank} - ${t.description}`;
+        option.text = `${t.date} - ${t.type}: ${t.amount.toFixed(2)} TL - ${t.bank} - ${t.description}`;
         list.appendChild(option);
-        total += t.type === "Gelir" ? t.amount : -t.amount;
+
+        if (t.type === "Gelir") {
+          totalIncome += t.amount;
+        } else if (t.type === "Gider") {
+          totalExpense += t.amount;
+        }
       });
 
-      document.getElementById("totalProfit").textContent = total.toFixed(2);
+      const totalProfit = totalIncome - totalExpense;
+
+      document.getElementById("totalIncome").textContent = totalIncome.toFixed(2);
+      document.getElementById("totalExpense").textContent = totalExpense.toFixed(2);
+      document.getElementById("totalProfit").textContent = totalProfit.toFixed(2);
     }
 
     document.getElementById("transactionForm").addEventListener("submit", function (e) {
@@ -175,16 +195,36 @@
 
       const list = document.getElementById("filteredResults");
       list.innerHTML = "";
-      let total = 0;
+
+      let totalIncome = 0;
+      let totalExpense = 0;
 
       filtered.forEach(t => {
         const li = document.createElement("li");
-        li.textContent = `${t.date} - ${t.type}: ${t.amount} TL - ${t.bank} - ${t.description}`;
+        li.textContent = `${t.date} - ${t.type}: ${t.amount.toFixed(2)} TL - ${t.bank} - ${t.description}`;
         list.appendChild(li);
-        total += t.type === "Gelir" ? t.amount : -t.amount;
+
+        if (t.type === "Gelir") {
+          totalIncome += t.amount;
+        } else if (t.type === "Gider") {
+          totalExpense += t.amount;
+        }
       });
 
-      document.getElementById("filteredProfit").textContent = total.toFixed(2);
+      const totalProfit = totalIncome - totalExpense;
+
+      document.getElementById("filteredProfit").textContent = totalProfit.toFixed(2);
+
+      // Eğer filtrelenmiş gelir/gider toplamlarını göstermek istersen, 
+      // yukarıdaki yorum satırlarını aç ve aşağıdaki satırları da aktif et:
+      /*
+      if (document.getElementById("filteredIncome")) {
+        document.getElementById("filteredIncome").textContent = totalIncome.toFixed(2);
+      }
+      if (document.getElementById("filteredExpense")) {
+        document.getElementById("filteredExpense").textContent = totalExpense.toFixed(2);
+      }
+      */
     }
 
     updateUI();
