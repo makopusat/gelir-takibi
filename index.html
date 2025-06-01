@@ -3,69 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <title>Gelir Gider Uygulaması</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 480px;
-      margin: 20px auto;
-      padding: 10px;
-    }
-    input, select, button {
-      padding: 8px;
-      margin: 6px 0;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    button {
-      cursor: pointer;
-    }
-  </style>
-</head>
-<body>
-  <h1>Gelir Gider Uygulaması</h1>
-
-  <!-- Başlangıç ekranı -->
-  <div id="startDiv">
-    <button onclick="showRegister()">Kayıt Ol</button>
-    <button onclick="showLogin()">Giriş Yap</button>
-  </div>
-
-  <!-- Kayıt formu -->
-  <div id="registerDiv" style="display:none;">
-    <h2>Kayıt Ol</h2>
-    <input type="email" id="registerEmail" placeholder="Email" />
-    <input type="password" id="registerPassword" placeholder="Şifre" />
-    <button onclick="register()">Kayıt Ol</button>
-    <button onclick="showLogin()">Zaten hesabım var, Giriş Yap</button>
-  </div>
-
-  <!-- Giriş formu -->
-  <div id="loginDiv" style="display:none;">
-    <h2>Giriş Yap</h2>
-    <input type="email" id="loginEmail" placeholder="Email" />
-    <input type="password" id="loginPassword" placeholder="Şifre" />
-    <button onclick="login()">Giriş Yap</button>
-    <button onclick="showRegister()">Hesabın yok mu? Kayıt Ol</button>
-  </div>
-
-  <!-- Uygulama ana ekranı -->
-  <div id="appDiv" style="display:none;">
-    <p id="welcome"></p>
-    <button onclick="logout()">Çıkış Yap</button>
-    <!-- Buraya uygulama içeriği gelecek -->
-  </div>
-
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import {
-      getAuth,
-      signInWithEmailAndPassword,
-      createUserWithEmailAndPassword,
-      signOut,
-      onAuthStateChanged,
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getFirestore, collection, addDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    // Firebase config'unu kendi projenle değiştir
+    // Firebase config - kendi projenle değiştir
     const firebaseConfig = {
       apiKey: "AIzaSyCTZXqmpVQeYwm2PoDwEYih9vDDl3A5rtI",
       authDomain: "gelir-gider-d3dc3.firebaseapp.com",
@@ -73,88 +16,162 @@
       storageBucket: "gelir-gider-d3dc3.appspot.com",
       messagingSenderId: "791363419549",
       appId: "1:791363419549:web:724a349a5efcd6b7c30374",
-      measurementId: "G-B8NKY7SR14",
+      measurementId: "G-B8NKY7SR14"
     };
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
+    const db = getFirestore(app);
 
-    function showRegister() {
-      document.getElementById("startDiv").style.display = "none";
-      document.getElementById("loginDiv").style.display = "none";
-      document.getElementById("registerDiv").style.display = "block";
-      document.getElementById("appDiv").style.display = "none";
+    // Giriş yap
+    window.login = function () {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      signInWithEmailAndPassword(auth, email, password)
+        .then(userCredential => {
+          console.log("Giriş başarılı:", userCredential.user.email);
+          document.getElementById("loginDiv").style.display = "none";
+          document.getElementById("appDiv").style.display = "block";
+          document.getElementById("welcome").innerText = "Hoş geldin, " + email;
+          loadReport();
+        })
+        .catch(error => {
+          console.error("Giriş Hatası:", error);
+          alert("Giriş Hatası: " + error.message);
+        });
     }
 
-    function showLogin() {
-      document.getElementById("startDiv").style.display = "none";
-      document.getElementById("registerDiv").style.display = "none";
-      document.getElementById("loginDiv").style.display = "block";
-      document.getElementById("appDiv").style.display = "none";
+    // Kayıt ol
+    window.register = function () {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      createUserWithEmailAndPassword(auth, email, password)
+        .then(userCredential => {
+          console.log("Kayıt başarılı:", userCredential.user.email);
+          alert("Kayıt başarılı! Şimdi giriş yapabilirsiniz.");
+        })
+        .catch(error => {
+          console.error("Kayıt Hatası:", error);
+          alert("Kayıt Hatası: " + error.message);
+        });
     }
 
-    function showStart() {
-      document.getElementById("startDiv").style.display = "block";
-      document.getElementById("registerDiv").style.display = "none";
-      document.getElementById("loginDiv").style.display = "none";
-      document.getElementById("appDiv").style.display = "none";
+    // Çıkış yap
+    window.logout = function () {
+      signOut(auth).then(() => {
+        document.getElementById("loginDiv").style.display = "block";
+        document.getElementById("appDiv").style.display = "none";
+        document.getElementById("welcome").innerText = "";
+        document.getElementById("report").innerText = "";
+      });
     }
 
-    async function register() {
-      const email = document.getElementById("registerEmail").value.trim();
-      const password = document.getElementById("registerPassword").value.trim();
-      if (!email || !password) {
-        alert("Lütfen email ve şifre giriniz.");
+    // Gelir/Gider ekle
+    window.addTransaction = async function () {
+      const user = auth.currentUser;
+      if (!user) {
+        alert("Lütfen önce giriş yapın.");
         return;
       }
-      try {
-        await createUserWithEmailAndPassword(auth, email, password);
-        alert("Kayıt başarılı! Lütfen giriş yapınız.");
-        showLogin();
-      } catch (e) {
-        alert("Kayıt hatası: " + e.message);
-      }
-    }
-
-    async function login() {
-      const email = document.getElementById("loginEmail").value.trim();
-      const password = document.getElementById("loginPassword").value.trim();
-      if (!email || !password) {
-        alert("Lütfen email ve şifre giriniz.");
+      const type = document.getElementById("type").value;
+      const amount = parseFloat(document.getElementById("amount").value);
+      if (isNaN(amount) || amount <= 0) {
+        alert("Lütfen geçerli bir tutar girin.");
         return;
       }
+      const description = document.getElementById("description").value || "";
+
       try {
-        await signInWithEmailAndPassword(auth, email, password);
-        // Giriş başarılı olursa onAuthStateChanged tetiklenir.
+        await addDoc(collection(db, "transactions"), {
+          userId: user.uid,
+          type,
+          amount,
+          description,
+          createdAt: new Date()
+        });
+        alert("Kayıt eklendi.");
+        document.getElementById("amount").value = "";
+        document.getElementById("description").value = "";
+        loadReport(); // Raporu güncelle
       } catch (e) {
-        alert("Giriş hatası: " + e.message);
+        console.error("Kayıt ekleme hatası:", e);
+        alert("Kayıt eklenirken hata oluştu.");
       }
     }
 
-    async function logout() {
-      await signOut(auth);
-      showStart();
+    // Raporu yükle
+    async function loadReport() {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      try {
+        const q = query(collection(db, "transactions"), where("userId", "==", user.uid));
+        const querySnapshot = await getDocs(q);
+
+        let totalIncome = 0;
+        let totalExpense = 0;
+
+        querySnapshot.forEach(doc => {
+          const data = doc.data();
+          if (data.type === "Gelir") totalIncome += data.amount;
+          else totalExpense += data.amount;
+        });
+
+        document.getElementById("report").innerText =
+          `Toplam Gelir: ${totalIncome.toFixed(2)} TL\n` +
+          `Toplam Gider: ${totalExpense.toFixed(2)} TL\n` +
+          `Net: ${(totalIncome - totalExpense).toFixed(2)} TL`;
+      } catch (e) {
+        console.error("Rapor yükleme hatası:", e);
+        document.getElementById("report").innerText = "Rapor yüklenirken hata oluştu.";
+      }
     }
 
-    onAuthStateChanged(auth, (user) => {
+    // Auth durumunu takip et
+    onAuthStateChanged(auth, user => {
       if (user) {
-        // Kullanıcı giriş yaptı
-        document.getElementById("welcome").innerText = `Hoşgeldin, ${user.email}`;
-        document.getElementById("appDiv").style.display = "block";
-        document.getElementById("startDiv").style.display = "none";
         document.getElementById("loginDiv").style.display = "none";
-        document.getElementById("registerDiv").style.display = "none";
+        document.getElementById("appDiv").style.display = "block";
+        document.getElementById("welcome").innerText = "Hoş geldin, " + user.email;
+        loadReport();
       } else {
-        // Kullanıcı çıkış yaptı
-        showStart();
+        document.getElementById("loginDiv").style.display = "block";
+        document.getElementById("appDiv").style.display = "none";
+        document.getElementById("welcome").innerText = "";
+        document.getElementById("report").innerText = "";
       }
     });
-
-    window.showRegister = showRegister;
-    window.showLogin = showLogin;
-    window.register = register;
-    window.login = login;
-    window.logout = logout;
   </script>
+</head>
+<body>
+  <h1>Gelir Gider Uygulaması</h1>
+
+  <!-- Giriş / Kayıt Formu -->
+  <div id="loginDiv">
+    <input type="email" id="email" placeholder="Email" /><br />
+    <input type="password" id="password" placeholder="Şifre" /><br />
+    <button onclick="login()">Giriş Yap</button>
+    <button onclick="register()">Kayıt Ol</button>
+  </div>
+
+  <!-- Ana Uygulama -->
+  <div id="appDiv" style="display:none;">
+    <p id="welcome"></p>
+    <button onclick="logout()">Çıkış Yap</button>
+
+    <h3>Yeni Gelir/Gider Ekle</h3>
+    <select id="type">
+      <option value="Gelir">Gelir</option>
+      <option value="Gider">Gider</option>
+    </select><br />
+    <input type="number" id="amount" placeholder="Tutar" /><br />
+    <input type="text" id="description" placeholder="Açıklama" /><br />
+    <button onclick="addTransaction()">Ekle</button>
+
+    <h3>Rapor</h3>
+    <pre id="report"></pre>
+  </div>
 </body>
 </html>
