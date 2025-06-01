@@ -1,141 +1,357 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <title>Gelir Gider Takip - Firebase Auth ve Basit Ana Sayfa</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    .hidden { display: none; }
-    button { margin-top: 10px; padding: 10px 20px; font-size: 16px; }
-    input { display: block; margin: 10px 0; padding: 8px; width: 300px; max-width: 100%; }
-    #message { height: 20px; margin-top: 10px; color: red; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Gelir Gider Takip</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0; padding: 20px;
+    background: #f0f4f8;
+  }
+  #auth-section, #app-section {
+    max-width: 500px;
+    margin: 0 auto;
+  }
+  input[type="email"], input[type="password"], input[type="number"], select {
+    width: 100%;
+    padding: 12px;
+    margin-top: 8px;
+    margin-bottom: 16px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 16px;
+  }
+  button {
+    width: 100%;
+    padding: 14px;
+    font-size: 18px;
+    background-color: #1976d2;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-bottom: 16px;
+    transition: background-color 0.3s ease;
+  }
+  button:hover {
+    background-color: #004ba0;
+  }
+  h2, h3, h4 {
+    text-align: center;
+  }
+  #message {
+    text-align: center;
+    height: 24px;
+    color: red;
+    margin-bottom: 12px;
+  }
+  #report {
+    background: white;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 0 5px rgba(0,0,0,0.1);
+  }
+  label {
+    font-weight: bold;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+  }
+  th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+  }
+  th {
+    background-color: #1976d2;
+    color: white;
+  }
+</style>
 </head>
 <body>
 
+<div id="auth-section">
   <h2>Giriş / Kayıt</h2>
-  <div id="auth-section">
-    <input id="email" type="email" placeholder="E-posta" />
-    <input id="password" type="password" placeholder="Şifre" />
-    <button id="register-btn">Kayıt Ol</button>
-    <button id="login-btn">Giriş Yap</button>
-    <div id="message"></div>
+  <input type="email" id="email" placeholder="E-posta" />
+  <input type="password" id="password" placeholder="Şifre" />
+  <button id="register-btn">Kayıt Ol</button>
+  <button id="login-btn">Giriş Yap</button>
+  <div id="message"></div>
+</div>
+
+<div id="app-section" style="display:none;">
+  <h3>Hoşgeldiniz, <span id="user-email"></span></h3>
+  <button id="logout-btn" style="background:#d32f2f;">Çıkış Yap</button>
+
+  <h4>Gelir Gider Takip</h4>
+  
+  <label for="type">Tür:</label>
+  <select id="type">
+    <option value="income">Gelir</option>
+    <option value="expense">Gider</option>
+  </select>
+
+  <label for="subcategory">Alt Kategori:</label>
+  <select id="subcategory">
+    <option value="">-- Alt Kategori Seçiniz veya Boş Bırakınız --</option>
+  </select>
+
+  <label for="amount">Tutar:</label>
+  <input type="number" id="amount" placeholder="Tutarı giriniz" />
+
+  <label for="date">Tarih:</label>
+  <input type="date" id="date" />
+
+  <button id="add-entry-btn">Ekle</button>
+
+  <h4>Rapor</h4>
+  <label for="start-date">Başlangıç Tarihi:</label>
+  <input type="date" id="start-date" />
+  <label for="end-date">Bitiş Tarihi:</label>
+  <input type="date" id="end-date" />
+  <button id="filter-btn">Filtrele</button>
+
+  <div id="report">
+    <p>Gelir Toplam: <span id="total-income">0</span> ₺</p>
+    <p>Gider Toplam: <span id="total-expense">0</span> ₺</p>
+    <p>Net Kar/Zarar: <span id="net-profit">0</span> ₺</p>
+
+    <table>
+      <thead>
+        <tr><th>Alt Kategori</th><th>Toplam Tutar</th></tr>
+      </thead>
+      <tbody id="report-table-body"></tbody>
+    </table>
   </div>
+</div>
 
-  <div id="app-section" class="hidden">
-    <h3>Hoşgeldiniz, <span id="user-email"></span></h3>
-    <button id="logout-btn">Çıkış Yap</button>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+  import { getFirestore, collection, addDoc, query, where, getDocs, Timestamp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-    <!-- Basit gelir-gider bölümü örneği -->
-    <h4>Gelir-Gider Ana Sayfa</h4>
-    <p>Burada gelir-gider kayıtları ve işlemler yapılabilir.</p>
-    <button id="open-income-expense">Gelir-Gider Bölümüne Gir</button>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCTZXqmpVQeYwm2PoDwEYih9vDDl3A5rtI",
+    authDomain: "gelir-gider-d3dc3.firebaseapp.com",
+    projectId: "gelir-gider-d3dc3",
+    storageBucket: "gelir-gider-d3dc3.appspot.com",
+    messagingSenderId: "791363419549",
+    appId: "1:791363419549:web:724a349a5efcd6b7c30374",
+    measurementId: "G-B8NKY7SR14"
+  };
 
-    <div id="income-expense-section" class="hidden" style="margin-top:20px;">
-      <h5>Gelir Gider İşlemleri</h5>
-      <p>Buraya gelir-gider formu ve raporlar eklenecek.</p>
-      <button id="back-btn">Ana Sayfaya Dön</button>
-    </div>
-  </div>
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const registerBtn = document.getElementById('register-btn');
+  const loginBtn = document.getElementById('login-btn');
+  const logoutBtn = document.getElementById('logout-btn');
+  const messageEl = document.getElementById('message');
+  const authSection = document.getElementById('auth-section');
+  const appSection = document.getElementById('app-section');
+  const userEmailEl = document.getElementById('user-email');
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyCTZXqmpVQeYwm2PoDwEYih9vDDl3A5rtI",
-      authDomain: "gelir-gider-d3dc3.firebaseapp.com",
-      projectId: "gelir-gider-d3dc3",
-      storageBucket: "gelir-gider-d3dc3.appspot.com",
-      messagingSenderId: "791363419549",
-      appId: "1:791363419549:web:724a349a5efcd6b7c30374",
-      measurementId: "G-B8NKY7SR14"
-    };
+  const typeSelect = document.getElementById('type');
+  const subcategorySelect = document.getElementById('subcategory');
+  const amountInput = document.getElementById('amount');
+  const dateInput = document.getElementById('date');
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
+  const addEntryBtn = document.getElementById('add-entry-btn');
 
-    const emailInput = document.getElementById('email');
-    const passwordInput = document.getElementById('password');
-    const registerBtn = document.getElementById('register-btn');
-    const loginBtn = document.getElementById('login-btn');
-    const logoutBtn = document.getElementById('logout-btn');
-    const messageEl = document.getElementById('message');
-    const authSection = document.getElementById('auth-section');
-    const appSection = document.getElementById('app-section');
-    const userEmailEl = document.getElementById('user-email');
+  const startDateInput = document.getElementById('start-date');
+  const endDateInput = document.getElementById('end-date');
+  const filterBtn = document.getElementById('filter-btn');
 
-    const openIncomeExpenseBtn = document.getElementById('open-income-expense');
-    const incomeExpenseSection = document.getElementById('income-expense-section');
-    const backBtn = document.getElementById('back-btn');
+  const totalIncomeEl = document.getElementById('total-income');
+  const totalExpenseEl = document.getElementById('total-expense');
+  const netProfitEl = document.getElementById('net-profit');
+  const reportTableBody = document.getElementById('report-table-body');
 
-    function showMessage(msg, color='red') {
-      messageEl.style.color = color;
-      messageEl.textContent = msg;
-      setTimeout(() => messageEl.textContent = '', 4000);
+  let currentUser = null;
+
+  function showMessage(msg, color = 'red') {
+    messageEl.style.color = color;
+    messageEl.textContent = msg;
+    setTimeout(() => messageEl.textContent = '', 4000);
+  }
+
+  registerBtn.addEventListener('click', () => {
+    const email = emailInput.value.trim();
+    const pass = passwordInput.value;
+    if (!email || !pass) {
+      showMessage('E-posta ve şifre gerekli.');
+      return;
+    }
+    createUserWithEmailAndPassword(auth, email, pass)
+      .then(() => showMessage('Kayıt başarılı! Giriş yapabilirsiniz.', 'green'))
+      .catch(err => showMessage('Kayıt hatası: ' + err.message));
+  });
+
+  loginBtn.addEventListener('click', () => {
+    const email = emailInput.value.trim();
+    const pass = passwordInput.value;
+    if (!email || !pass) {
+      showMessage('E-posta ve şifre gerekli.');
+      return;
+    }
+    signInWithEmailAndPassword(auth, email, pass)
+      .then(() => showMessage('Giriş başarılı!', 'green'))
+      .catch(err => showMessage('Giriş hatası: ' + err.message));
+  });
+
+  logoutBtn.addEventListener('click', () => {
+    signOut(auth).then(() => showMessage('Çıkış yapıldı.', 'green'));
+  });
+
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      currentUser = user;
+      authSection.style.display = 'none';
+      appSection.style.display = 'block';
+      userEmailEl.textContent = user.email;
+
+      // Varsayılan tarihleri bugüne ayarla
+      const today = new Date().toISOString().substring(0, 10);
+      dateInput.value = today;
+      startDateInput.value = today;
+      endDateInput.value = today;
+
+      clearInputs();
+      loadReport(); // Girişte raporu yükle
+    } else {
+      currentUser = null;
+      authSection.style.display = 'block';
+      appSection.style.display = 'none';
+      emailInput.value = '';
+      passwordInput.value = '';
+      clearInputs();
+      clearReport();
+    }
+  });
+
+  function clearInputs() {
+    amountInput.value = '';
+    subcategorySelect.value = '';
+    typeSelect.value = 'income';
+  }
+
+  addEntryBtn.addEventListener('click', async () => {
+    if (!currentUser) {
+      showMessage('Lütfen giriş yapınız.');
+      return;
     }
 
-    registerBtn.addEventListener('click', () => {
-      const email = emailInput.value.trim();
-      const pass = passwordInput.value;
-      if (!email || !pass) {
-        showMessage('E-posta ve şifre gerekli.');
-        return;
-      }
-      createUserWithEmailAndPassword(auth, email, pass)
-        .then(() => {
-          showMessage('Kayıt başarılı, giriş yapabilirsiniz.', 'green');
-        })
-        .catch(err => {
-          showMessage('Kayıt hatası: ' + err.message);
-        });
-    });
+    const type = typeSelect.value;
+    const subcategory = subcategorySelect.value;
+    const amount = parseFloat(amountInput.value);
+    const dateValue = dateInput.value;
 
-    loginBtn.addEventListener('click', () => {
-      const email = emailInput.value.trim();
-      const pass = passwordInput.value;
-      if (!email || !pass) {
-        showMessage('E-posta ve şifre gerekli.');
-        return;
-      }
-      signInWithEmailAndPassword(auth, email, pass)
-        .then(() => {
-          showMessage('Giriş başarılı!', 'green');
-        })
-        .catch(err => {
-          showMessage('Giriş hatası: ' + err.message);
-        });
-    });
+    if (!amount || amount <= 0) {
+      showMessage('Lütfen geçerli bir tutar giriniz.');
+      return;
+    }
+    if (!dateValue) {
+      showMessage('Lütfen tarih seçiniz.');
+      return;
+    }
 
-    logoutBtn.addEventListener('click', () => {
-      signOut(auth).then(() => {
-        showMessage('Çıkış yapıldı.', 'green');
+    try {
+      await addDoc(collection(db, 'entries'), {
+        uid: currentUser.uid,
+        type: type,
+        subcategory: subcategory,
+        amount: amount,
+        date: Timestamp.fromDate(new Date(dateValue))
       });
-    });
+      showMessage('Kayıt eklendi.', 'green');
+      clearInputs();
+      loadReport();
+    } catch (error) {
+      showMessage('Kayıt eklenirken hata: ' + error.message);
+    }
+  });
 
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        authSection.classList.add('hidden');
-        appSection.classList.remove('hidden');
-        userEmailEl.textContent = user.email;
+  filterBtn.addEventListener('click', () => {
+    loadReport();
+  });
 
-        // Gelir-gider bölümü kapalı olsun başlangıçta
-        incomeExpenseSection.classList.add('hidden');
-      } else {
-        authSection.classList.remove('hidden');
-        appSection.classList.add('hidden');
-        emailInput.value = '';
-        passwordInput.value = '';
+  async function loadReport() {
+    if (!currentUser) return;
+
+    let startDate = startDateInput.value;
+    let endDate = endDateInput.value;
+
+    if (!startDate || !endDate) {
+      showMessage('Başlangıç ve bitiş tarihlerini seçiniz.');
+      return;
+    }
+
+    // firestore'da tarih sorgusu için Timestamp kullanacağız
+    const startTimestamp = Timestamp.fromDate(new Date(startDate + 'T00:00:00'));
+    const endTimestamp = Timestamp.fromDate(new Date(endDate + 'T23:59:59'));
+
+    const q = query(
+      collection(db, 'entries'),
+      where('uid', '==', currentUser.uid),
+      where('date', '>=', startTimestamp),
+      where('date', '<=', endTimestamp)
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    let incomeTotal = 0;
+    let expenseTotal = 0;
+    const subcategoryTotals = {};
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      const type = data.type;
+      const amount = data.amount;
+      const subcat = data.subcategory || 'Diğer';
+
+      if (!subcategoryTotals[subcat]) {
+        subcategoryTotals[subcat] = 0;
       }
+      subcategoryTotals[subcat] += amount;
+
+      if (type === 'income') incomeTotal += amount;
+      else if (type === 'expense') expenseTotal += amount;
     });
 
-    openIncomeExpenseBtn.addEventListener('click', () => {
-      incomeExpenseSection.classList.remove('hidden');
-    });
+    // Raporu güncelle
+    totalIncomeEl.textContent = incomeTotal.toFixed(2);
+    totalExpenseEl.textContent = expenseTotal.toFixed(2);
+    netProfitEl.textContent = (incomeTotal - expenseTotal).toFixed(2);
 
-    backBtn.addEventListener('click', () => {
-      incomeExpenseSection.classList.add('hidden');
-    });
-  </script>
+    // Tabloyu oluştur
+    reportTableBody.innerHTML = '';
+    for (const [subcat, total] of Object.entries(subcategoryTotals)) {
+      const tr = document.createElement('tr');
+      const tdSubcat = document.createElement('td');
+      tdSubcat.textContent = subcat;
+      const tdTotal = document.createElement('td');
+      tdTotal.textContent = total.toFixed(2) + ' ₺';
+      tr.appendChild(tdSubcat);
+      tr.appendChild(tdTotal);
+      reportTableBody.appendChild(tr);
+    }
+  }
+
+  function clearReport() {
+    totalIncomeEl.textContent = '0';
+    totalExpenseEl.textContent = '0';
+    netProfitEl.textContent = '0';
+    reportTableBody.innerHTML = '';
+  }
+
+</script>
+
 </body>
 </html>
