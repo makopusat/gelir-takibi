@@ -2,14 +2,16 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
-  <title>Gelir/Gider Takip</title>
+  <title>Gelir/Gider Takip ve Rapor PDF</title>
   <style>
     body { font-family: Arial; margin: 20px; }
     label, select, input, button { margin: 5px 0; display: block; }
     ul li { margin: 6px 0; cursor: pointer; }
-    button { padding: 4px 8px; }
+    button { padding: 6px 12px; margin-top: 8px; }
     .section { margin-bottom: 20px; border: 1px solid #ccc; padding: 10px; border-radius: 8px; }
   </style>
+  <!-- jsPDF CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
   <h2>Gelir/Gider Takip Sistemi</h2>
@@ -23,7 +25,7 @@
       </select>
 
       <label for="amount">Tutar:</label>
-      <input type="number" id="amount" required />
+      <input type="number" id="amount" required min="0" step="0.01" />
 
       <label for="description">Açıklama:</label>
       <input type="text" id="description" required />
@@ -53,14 +55,19 @@
     <input type="date" id="endDate" />
 
     <button onclick="filterByDate()">Raporla</button>
+    <button onclick="exportPDF()" style="margin-left:10px;">PDF Olarak Dışa Aktar</button>
 
     <h4>Filtrelenmiş Toplam Kar: <span id="filteredProfit">0</span> TL</h4>
-    <ul id="filteredResults"></ul>
+    <ul id="filteredResults" style="list-style:none; padding-left:0;"></ul>
   </div>
 
   <script>
+    // jsPDF hazırlandı
+    const { jsPDF } = window.jspdf;
+
     let transactions = JSON.parse(localStorage.getItem("transactions")) || [];
     let selectedIndex = null;
+    let lastFilteredGrouped = {}; // PDF için son filtre sonucu
 
     function updateUI() {
       const list = document.getElementById("transactionList");
@@ -71,7 +78,7 @@
       transactions.forEach((t, i) => {
         const option = document.createElement("option");
         option.value = i;
-        option.text = `${t.date} - ${t.type}: ${t.amount} TL - ${t.description}`;
+        option.text = `${t.date} - ${t.type}: ${t.amount.toFixed(2)} TL - ${t.description}`;
         list.appendChild(option);
         total += t.type === "Gelir" ? t.amount : -t.amount;
       });
@@ -85,7 +92,7 @@
       const newTransaction = {
         type: document.getElementById("type").value,
         amount: parseFloat(document.getElementById("amount").value),
-        description: document.getElementById("description").value,
+        description: document.getElementById("description").value.trim(),
         date: document.getElementById("date").value,
       };
 
@@ -118,7 +125,7 @@
       const updatedTransaction = {
         type: document.getElementById("type").value,
         amount: parseFloat(document.getElementById("amount").value),
-        description: document.getElementById("description").value,
+        description: document.getElementById("description").value.trim(),
         date: document.getElementById("date").value,
       };
 
@@ -156,7 +163,6 @@
       const startDate = new Date(start);
       const endDate = new Date(end);
 
-      // Filtrelenmiş işlemler
       const filtered = transactions.filter(t => {
         const tDate = new Date(t.date);
         return tDate >= startDate && tDate <= endDate;
@@ -177,21 +183,21 @@
         }
       });
 
-      // Listeyi temizle
+      lastFilteredGrouped = grouped; // PDF için kaydet
+
       const list = document.getElementById("filteredResults");
       list.innerHTML = "";
 
       let totalIncome = 0;
       let totalExpense = 0;
 
-      // Gruplanmış veriyi listeye ekle
       for (const desc in grouped) {
         const gelir = grouped[desc].gelir;
         const gider = grouped[desc].gider;
-        const kar = gelir - gider;
+        const net = gelir - gider;
 
         const li = document.createElement("li");
-        li.textContent = `${desc} - Toplam Gelir: ${gelir.toFixed(2)} TL, Toplam Gider: ${gider.toFixed(2)} TL, Net: ${kar.toFixed(2)} TL`;
+        li.textContent = `${desc} — Toplam Gelir: ${gelir.toFixed(2)} TL, Toplam Gider: ${gider.toFixed(2)} TL, Net: ${net.toFixed(2)} TL`;
         list.appendChild(li);
 
         totalIncome += gelir;
@@ -200,6 +206,69 @@
 
       const totalProfit = totalIncome - totalExpense;
       document.getElementById("filteredProfit").textContent = totalProfit.toFixed(2);
+    }
+
+    // PDF dışa aktar ve yazdır
+    function exportPDF() {
+      if (!lastFilteredGrouped || Object.keys(lastFilteredGrouped).length === 0) {
+        alert("Önce raporu oluşturunuz.");
+        return;
+      }
+
+      const doc = new jsPDF();
+
+      doc.setFontSize(16);
+      doc.text("Gelir/Gider Raporu", 14, 20);
+
+      let y = 30;
+      doc.setFontSize(12);
+
+      // Başlıklar
+      doc.text("Açıklama", 14, y);
+      doc.text("Toplam Gelir (TL)", 90, y);
+      doc.text("Toplam Gider (TL)", 130, y);
+      doc.text("Net (TL)", 170, y);
+      y += 6;
+      doc.line(14, y, 195, y);
+      y += 4;
+
+      let totalIncome = 0;
+      let totalExpense = 0;
+
+      for (const desc in lastFilteredGrouped) {
+        const gelir = lastFilteredGrouped[desc].gelir;
+        const gider = lastFilteredGrouped[desc].gider;
+        const net = gelir - gider;
+
+        doc.text(desc, 14, y);
+        doc.text(gelir.toFixed(2), 100, y, null, null, "right");
+        doc.text(gider.toFixed(2), 140, y, null, null, "right");
+        doc.text(net.toFixed(2), 180, y, null, null, "right");
+
+        y += 8;
+        if (y > 280) { // Yeni sayfa
+          doc.addPage();
+          y = 20;
+        }
+
+        totalIncome += gelir;
+        totalExpense += gider;
+      }
+
+      const totalNet = totalIncome - totalExpense;
+      y += 6;
+      doc.line(14, y, 195, y);
+      y += 8;
+
+      doc.setFontSize(14);
+      doc.text("Toplam Gelir: " + totalIncome.toFixed(2) + " TL", 14, y);
+      y += 8;
+      doc.text("Toplam Gider: " + totalExpense.toFixed(2) + " TL", 14, y);
+      y += 8;
+      doc.text("Net Toplam Kar: " + totalNet.toFixed(2) + " TL", 14, y);
+
+      // PDF'yi aç / indir / yazdırabiliriz
+      doc.save("gelir-gider-raporu.pdf");
     }
 
     updateUI();
