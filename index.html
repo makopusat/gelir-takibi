@@ -8,7 +8,6 @@
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { getFirestore, collection, addDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    // Firebase config - kendi projenle değiştir
     const firebaseConfig = {
       apiKey: "AIzaSyCTZXqmpVQeYwm2PoDwEYih9vDDl3A5rtI",
       authDomain: "gelir-gider-d3dc3.firebaseapp.com",
@@ -23,7 +22,6 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // Giriş yap
     window.login = function () {
       const email = document.getElementById("email").value;
       const password = document.getElementById("password").value;
@@ -32,7 +30,10 @@
         .then(userCredential => {
           console.log("Giriş başarılı:", userCredential.user.email);
           document.getElementById("loginDiv").style.display = "none";
-          document.getElementById("appDiv").style.display = "block";
+          const appDiv = document.getElementById("appDiv");
+          appDiv.style.display = "block";
+          appDiv.style.visibility = "visible";
+          appDiv.style.opacity = "1";
           document.getElementById("welcome").innerText = "Hoş geldin, " + email;
           loadReport();
         })
@@ -42,7 +43,6 @@
         });
     }
 
-    // Kayıt ol
     window.register = function () {
       const email = document.getElementById("email").value;
       const password = document.getElementById("password").value;
@@ -58,17 +58,18 @@
         });
     }
 
-    // Çıkış yap
     window.logout = function () {
       signOut(auth).then(() => {
         document.getElementById("loginDiv").style.display = "block";
-        document.getElementById("appDiv").style.display = "none";
+        const appDiv = document.getElementById("appDiv");
+        appDiv.style.display = "none";
+        appDiv.style.visibility = "hidden";
+        appDiv.style.opacity = "0";
         document.getElementById("welcome").innerText = "";
         document.getElementById("report").innerText = "";
       });
     }
 
-    // Gelir/Gider ekle
     window.addTransaction = async function () {
       const user = auth.currentUser;
       if (!user) {
@@ -94,14 +95,13 @@
         alert("Kayıt eklendi.");
         document.getElementById("amount").value = "";
         document.getElementById("description").value = "";
-        loadReport(); // Raporu güncelle
+        loadReport();
       } catch (e) {
         console.error("Kayıt ekleme hatası:", e);
         alert("Kayıt eklenirken hata oluştu.");
       }
     }
 
-    // Raporu yükle
     async function loadReport() {
       const user = auth.currentUser;
       if (!user) return;
@@ -129,16 +129,21 @@
       }
     }
 
-    // Auth durumunu takip et
     onAuthStateChanged(auth, user => {
       if (user) {
         document.getElementById("loginDiv").style.display = "none";
-        document.getElementById("appDiv").style.display = "block";
+        const appDiv = document.getElementById("appDiv");
+        appDiv.style.display = "block";
+        appDiv.style.visibility = "visible";
+        appDiv.style.opacity = "1";
         document.getElementById("welcome").innerText = "Hoş geldin, " + user.email;
         loadReport();
       } else {
         document.getElementById("loginDiv").style.display = "block";
-        document.getElementById("appDiv").style.display = "none";
+        const appDiv = document.getElementById("appDiv");
+        appDiv.style.display = "none";
+        appDiv.style.visibility = "hidden";
+        appDiv.style.opacity = "0";
         document.getElementById("welcome").innerText = "";
         document.getElementById("report").innerText = "";
       }
@@ -148,7 +153,6 @@
 <body>
   <h1>Gelir Gider Uygulaması</h1>
 
-  <!-- Giriş / Kayıt Formu -->
   <div id="loginDiv">
     <input type="email" id="email" placeholder="Email" /><br />
     <input type="password" id="password" placeholder="Şifre" /><br />
@@ -156,8 +160,7 @@
     <button onclick="register()">Kayıt Ol</button>
   </div>
 
-  <!-- Ana Uygulama -->
-  <div id="appDiv" style="display:none;">
+  <div id="appDiv" style="display:none; visibility:hidden; opacity:0; transition: opacity 0.3s ease;">
     <p id="welcome"></p>
     <button onclick="logout()">Çıkış Yap</button>
 
