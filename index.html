@@ -92,16 +92,16 @@
     <button onclick="forgotPassword()">Şifre Unuttum</button>
 </div>
 
-<!-- Ana uygulama kısmı, başlangıçta gizli -->
-<div id="appSection" style="display: none;">
-    <div id="bankSection">
-        <label for="bank">Banka Seçin:</label>
-        <select id="bank">
-            <!-- Dinamik olarak eklenen bankalar buraya eklenecek -->
-        </select>
-        <button onclick="addBank()">Banka Ekle</button>
-        <input type="text" id="newBankName" placeholder="Yeni banka adı" style="display: none;">
-    </div>
+<!-- Banka ekleme alanı -->
+<div id="bankSection">
+    <label for="bank">Banka Seçin:</label>
+    <select id="bank">
+        <!-- Dinamik olarak eklenen bankalar buraya eklenecek -->
+    </select>
+    <button onclick="addBank()">Banka Ekle</button>
+    <button onclick="deleteBank()">Banka Sil</button> <!-- <-- Buraya eklendi -->
+    <input type="text" id="newBankName" placeholder="Yeni banka adı" style="display: none;">
+</div>
 
     <div>
         <label for="amount">Tutar:</label>
