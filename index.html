@@ -2,32 +2,116 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
-  <title>Gelir/Gider Takip Sistemi - Firebase Auth</title>
+  <title>Gelir/Gider Takip Sistemi</title>
   <style>
-    body { font-family: Arial; margin: 20px; }
-    label, select, input, button { margin: 5px 0; display: block; }
-    button { padding: 6px 12px; margin-top: 10px; }
-    .section { margin-bottom: 20px; border: 1px solid #ccc; padding: 15px; border-radius: 8px; }
-    #authSection, #appSection { max-width: 400px; }
-    #appSection { display: none; }
-    #logoutBtn { background: #c33; color: white; border: none; cursor: pointer; margin-bottom: 10px; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #f7f9fc;
+      color: #333;
+    }
+    h2 {
+      text-align: center;
+      color: #2c3e50;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 12px rgba(0,0,0,0.1);
+    }
+    label {
+      margin-top: 12px;
+      font-weight: bold;
+      display: block;
+    }
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="date"],
+    select {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+      font-size: 1rem;
+    }
+    button {
+      margin-top: 15px;
+      padding: 12px;
+      width: 100%;
+      font-size: 1.1rem;
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+      color: white;
+      background-color: #3498db;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    button.delete {
+      background-color: #e74c3c;
+    }
+    button.delete:hover {
+      background-color: #c0392b;
+    }
+    select#transactionList {
+      width: 100%;
+      height: 140px;
+      margin-top: 10px;
+      font-size: 0.95rem;
+    }
+    #message {
+      margin: 10px 0;
+      text-align: center;
+      font-weight: bold;
+      color: #e74c3c;
+    }
+    #welcome {
+      text-align: center;
+      font-size: 1.2rem;
+      margin-bottom: 20px;
+      color: #27ae60;
+    }
+    .hidden {
+      display: none;
+    }
+    .flex-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .flex-buttons button {
+      width: 50%;
+    }
   </style>
 </head>
 <body>
+  <div class="container" id="authContainer">
+    <h2>Kullanıcı Girişi / Kayıt</h2>
+    <div id="message"></div>
 
-  <h2>Gelir/Gider Takip Sistemi</h2>
+    <label for="email">E-posta:</label>
+    <input type="email" id="email" placeholder="E-posta girin" required />
 
-  <div id="authSection" class="section">
-    <h3>Kayıt Ol / Giriş Yap</h3>
-    <input type="email" id="email" placeholder="Email" required />
-    <input type="password" id="password" placeholder="Şifre" required />
-    <button id="signupBtn">Kayıt Ol</button>
-    <button id="loginBtn">Giriş Yap</button>
-    <div id="authMessage" style="color:red;margin-top:10px;"></div>
+    <label for="password">Şifre:</label>
+    <input type="password" id="password" placeholder="Şifre girin" required />
+
+    <div class="flex-buttons">
+      <button id="registerBtn">Kayıt Ol</button>
+      <button id="loginBtn">Giriş Yap</button>
+    </div>
   </div>
 
-  <div id="appSection" class="section">
-    <button id="logoutBtn">Çıkış Yap</button>
+  <div class="container hidden" id="appContainer">
+    <div id="welcome"></div>
 
     <form id="transactionForm">
       <label for="type">Tür:</label>
@@ -38,11 +122,17 @@
 
       <label for="subcategory">Alt Kategori:</label>
       <select id="subcategory" required></select>
-      <input type="text" id="newSubcategory" placeholder="Yeni Alt Kategori Ekle" />
-      <button type="button" onclick="addSubcategory()">Alt Kategori Ekle</button>
 
-      <label for="amount">Tutar:</label>
-      <input type="number" id="amount" required />
+      <input
+        type="text"
+        id="newSubcategory"
+        placeholder="Yeni Alt Kategori Ekle"
+        autocomplete="off"
+      />
+      <button type="button" id="addSubcategoryBtn">Alt Kategori Ekle</button>
+
+      <label for="amount">Tutar (TL):</label>
+      <input type="number" id="amount" min="0.01" step="0.01" required />
 
       <label for="description">Açıklama:</label>
       <input type="text" id="description" required />
@@ -50,211 +140,294 @@
       <label for="date">Tarih:</label>
       <input type="date" id="date" required />
 
-      <button type="submit" id="addBtn">Ekle</button>
+      <button type="submit" id="addBtn">Gelir/Gider Ekle</button>
+      <button type="button" id="editBtn" class="hidden">Kaydet</button>
     </form>
 
     <h3>İşlem Listesi</h3>
-    <select id="transactionList" size="8" style="width: 100%;"></select>
-    <h4>Toplam Gelir: <span id="totalIncome">0</span> TL</h4>
-    <h4>Toplam Gider: <span id="totalExpense">0</span> TL</h4>
-    <h4>Toplam Kar: <span id="totalProfit">0</span> TL</h4>
+    <select id="transactionList" size="8"></select>
+    <div class="flex-buttons">
+      <button id="editSelectedBtn">Düzenle</button>
+      <button id="deleteSelectedBtn" class="delete">Sil</button>
+    </div>
+
+    <h4>Toplam Gelir: <span id="totalIncome">0.00</span> TL</h4>
+    <h4>Toplam Gider: <span id="totalExpense">0.00</span> TL</h4>
+    <h4>Toplam Kar: <span id="totalProfit">0.00</span> TL</h4>
+
+    <button id="logoutBtn" style="background:#95a5a6; margin-top: 30px;">Çıkış Yap</button>
   </div>
 
-  <!-- Firebase SDK -->
   <script type="module">
-    // Firebase imports
+    // Firebase imports (CDN or npm)
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics.js";
-    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
-    import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+    import {
+      getAuth,
+      createUserWithEmailAndPassword,
+      signInWithEmailAndPassword,
+      onAuthStateChanged,
+      signOut,
+    } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
 
     // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyCTZXqmpVQeYwm2PoDwEYih9vDDl3A5rtI",
       authDomain: "gelir-gider-d3dc3.firebaseapp.com",
       projectId: "gelir-gider-d3dc3",
-      storageBucket: "gelir-gider-d3dc3.appspot.com",
+      storageBucket: "gelir-gider-d3dc3.firebasestorage.app",
       messagingSenderId: "791363419549",
       appId: "1:791363419549:web:724a349a5efcd6b7c30374",
-      measurementId: "G-B8NKY7SR14"
+      measurementId: "G-B8NKY7SR14",
     };
 
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
-    const analytics = getAnalytics(app);
     const auth = getAuth(app);
-    const db = getDatabase(app);
 
     // Elements
-    const authSection = document.getElementById("authSection");
-    const appSection = document.getElementById("appSection");
-    const emailInput = document.getElementById("email");
-    const passwordInput = document.getElementById("password");
-    const signupBtn = document.getElementById("signupBtn");
+    const authContainer = document.getElementById("authContainer");
+    const appContainer = document.getElementById("appContainer");
+    const messageEl = document.getElementById("message");
+    const welcomeEl = document.getElementById("welcome");
+
+    const emailEl = document.getElementById("email");
+    const passwordEl = document.getElementById("password");
+    const registerBtn = document.getElementById("registerBtn");
     const loginBtn = document.getElementById("loginBtn");
-    const authMessage = document.getElementById("authMessage");
     const logoutBtn = document.getElementById("logoutBtn");
 
+    // Transaction form elements
     const typeEl = document.getElementById("type");
     const subcategoryEl = document.getElementById("subcategory");
-    const newSubcategoryInput = document.getElementById("newSubcategory");
-    const amountInput = document.getElementById("amount");
-    const descriptionInput = document.getElementById("description");
-    const dateInput = document.getElementById("date");
+    const newSubcategoryEl = document.getElementById("newSubcategory");
+    const addSubcategoryBtn = document.getElementById("addSubcategoryBtn");
+    const amountEl = document.getElementById("amount");
+    const descriptionEl = document.getElementById("description");
+    const dateEl = document.getElementById("date");
     const transactionForm = document.getElementById("transactionForm");
-    const transactionList = document.getElementById("transactionList");
-    const totalIncomeEl = document.getElementById("totalIncome");
-    const totalExpenseEl = document.getElementById("totalExpense");
-    const totalProfitEl = document.getElementById("totalProfit");
+    const transactionListEl = document.getElementById("transactionList");
+    const addBtn = document.getElementById("addBtn");
+    const editBtn = document.getElementById("editBtn");
+    const editSelectedBtn = document.getElementById("editSelectedBtn");
+    const deleteSelectedBtn = document.getElementById("deleteSelectedBtn");
 
-    let subcategories = { Gelir: ["Maaş", "Yatırım"], Gider: ["Kira", "Fatura"] };
-    let currentUser = null;
+    // Data
+    let transactions = [];
+    let subcategories = { Gelir: [], Gider: [] };
+    let selectedIndex = null;
 
-    // Update subcategory options
+    // Load data from localStorage if exists
+    function loadData() {
+      const t = localStorage.getItem("transactions");
+      const s = localStorage.getItem("subcategories");
+      transactions = t ? JSON.parse(t) : [];
+      subcategories = s ? JSON.parse(s) : { Gelir: [], Gider: [] };
+    }
+
+    // Save data to localStorage
+    function saveData() {
+      localStorage.setItem("transactions", JSON.stringify(transactions));
+      localStorage.setItem("subcategories", JSON.stringify(subcategories));
+    }
+
+    // Update subcategory dropdown
     function updateSubcategoryOptions() {
       const type = typeEl.value;
       subcategoryEl.innerHTML = "";
-      subcategories[type].forEach(sub => {
+      subcategories[type].forEach((sub) => {
         const opt = document.createElement("option");
         opt.value = sub;
         opt.textContent = sub;
         subcategoryEl.appendChild(opt);
       });
+      if (subcategoryEl.options.length === 0) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "-- Alt kategori yok, ekleyin --";
+        subcategoryEl.appendChild(opt);
+      }
     }
 
     // Add new subcategory
-    window.addSubcategory = function () {
+    addSubcategoryBtn.addEventListener("click", () => {
       const type = typeEl.value;
-      const newSub = newSubcategoryInput.value.trim();
-      if (!newSub) return alert("Alt kategori boş olamaz.");
+      const newSub = newSubcategoryEl.value.trim();
+      if (!newSub) {
+        alert("Alt kategori boş olamaz!");
+        return;
+      }
       if (!subcategories[type].includes(newSub)) {
         subcategories[type].push(newSub);
+        saveData();
         updateSubcategoryOptions();
-        newSubcategoryInput.value = "";
-      }
-    };
-
-    typeEl.addEventListener("change", updateSubcategoryOptions);
-
-    // Listen auth state
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        currentUser = user;
-        authSection.style.display = "none";
-        appSection.style.display = "block";
-        loadTransactions();
-        updateSubcategoryOptions();
+        newSubcategoryEl.value = "";
+        subcategoryEl.value = newSub;
       } else {
-        currentUser = null;
-        authSection.style.display = "block";
-        appSection.style.display = "none";
-        clearTransactionsUI();
+        alert("Bu alt kategori zaten mevcut.");
       }
     });
 
-    // Sign up
-    signupBtn.addEventListener("click", () => {
-      authMessage.textContent = "";
-      const email = emailInput.value.trim();
-      const password = passwordInput.value.trim();
-      if (!email || !password) {
-        authMessage.textContent = "Email ve şifre gereklidir.";
-        return;
-      }
-      createUserWithEmailAndPassword(auth, email, password)
-        .then(() => {
-          authMessage.style.color = "green";
-          authMessage.textContent = "Kayıt başarılı! Giriş yapabilirsiniz.";
-        })
-        .catch(err => {
-          authMessage.style.color = "red";
-          authMessage.textContent = "Hata: " + err.message;
-        });
-    });
-
-    // Login
-    loginBtn.addEventListener("click", () => {
-      authMessage.textContent = "";
-      const email = emailInput.value.trim();
-      const password = passwordInput.value.trim();
-      if (!email || !password) {
-        authMessage.textContent = "Email ve şifre gereklidir.";
-        return;
-      }
-      signInWithEmailAndPassword(auth, email, password)
-        .catch(err => {
-          authMessage.style.color = "red";
-          authMessage.textContent = "Hata: " + err.message;
-        });
-    });
-
-    // Logout
-    logoutBtn.addEventListener("click", () => {
-      signOut(auth);
-    });
-
-    // Load transactions from Firebase DB
-    function loadTransactions() {
-      const userTransactionsRef = ref(db, 'users/' + currentUser.uid + '/transactions');
-      onValue(userTransactionsRef, (snapshot) => {
-        const data = snapshot.val();
-        let transactions = [];
-        if (data) {
-          transactions = Object.values(data);
-          // each transaction has key?
-        }
-        renderTransactions(transactions);
-      });
-    }
-
-    // Render transactions to UI and show totals
-    function renderTransactions(transactions) {
-      transactionList.innerHTML = "";
+    // Update transaction list UI
+    function updateUI() {
+      transactionListEl.innerHTML = "";
       let totalIncome = 0;
       let totalExpense = 0;
+
       transactions.forEach((t, i) => {
         const option = document.createElement("option");
         option.value = i;
-        option.text = `${t.date} - ${t.type}: ${t.amount} TL - ${t.subcategory} - ${t.description}`;
-        transactionList.appendChild(option);
-        if (t.type === "Gelir") totalIncome += Number(t.amount);
-        else totalExpense += Number(t.amount);
+        option.text = `${t.date} - ${t.type}: ${t.amount.toFixed(2)} TL - ${t.subcategory} - ${t.description}`;
+        transactionListEl.appendChild(option);
+        if (t.type === "Gelir") totalIncome += t.amount;
+        else totalExpense += t.amount;
       });
-      totalIncomeEl.textContent = totalIncome.toFixed(2);
-      totalExpenseEl.textContent = totalExpense.toFixed(2);
-      totalProfitEl.textContent = (totalIncome - totalExpense).toFixed(2);
+
+      document.getElementById("totalIncome").textContent = totalIncome.toFixed(2);
+      document.getElementById("totalExpense").textContent = totalExpense.toFixed(2);
+      document.getElementById("totalProfit").textContent = (totalIncome - totalExpense).toFixed(2);
+
+      updateSubcategoryOptions();
     }
 
-    function clearTransactionsUI() {
-      transactionList.innerHTML = "";
-      totalIncomeEl.textContent = "0";
-      totalExpenseEl.textContent = "0";
-      totalProfitEl.textContent = "0";
-    }
-
-    // Add new transaction to Firebase DB
+    // Add new transaction
     transactionForm.addEventListener("submit", (e) => {
       e.preventDefault();
-      if (!currentUser) return alert("Lütfen giriş yapınız.");
 
       const newTransaction = {
         type: typeEl.value,
         subcategory: subcategoryEl.value,
-        amount: parseFloat(amountInput.value),
-        description: descriptionInput.value,
-        date: dateInput.value
+        amount: parseFloat(amountEl.value),
+        description: descriptionEl.value,
+        date: dateEl.value,
       };
 
-      const userTransactionsRef = ref(db, 'users/' + currentUser.uid + '/transactions');
-      push(userTransactionsRef, newTransaction)
-        .then(() => {
-          transactionForm.reset();
-        })
-        .catch(err => alert("Hata: " + err.message));
+      // Validate subcategory
+      if (!newTransaction.subcategory) {
+        alert("Lütfen geçerli bir alt kategori seçin.");
+        return;
+      }
+
+      if (selectedIndex === null) {
+        transactions.push(newTransaction);
+      } else {
+        transactions[selectedIndex] = newTransaction;
+        selectedIndex = null;
+        addBtn.style.display = "block";
+        editBtn.classList.add("hidden");
+      }
+
+      saveData();
+      transactionForm.reset();
+      updateUI();
     });
 
-    updateSubcategoryOptions();
-  </script>
+    // Edit selected transaction
+    editSelectedBtn.addEventListener("click", () => {
+      const selected = transactionListEl.selectedIndex;
+      if (selected === -1) {
+        alert("Lütfen düzenlemek için bir işlem seçin.");
+        return;
+      }
 
+      selectedIndex = selected;
+      const t = transactions[selectedIndex];
+
+      typeEl.value = t.type;
+      updateSubcategoryOptions();
+      subcategoryEl.value = t.subcategory;
+      amountEl.value = t.amount;
+      descriptionEl.value = t.description;
+      dateEl.value = t.date;
+
+      addBtn.style.display = "none";
+      editBtn.classList.remove("hidden");
+    });
+
+    // Save edited transaction
+    editBtn.addEventListener("click", () => {
+      transactionForm.dispatchEvent(new Event("submit"));
+    });
+
+    // Delete selected transaction
+    deleteSelectedBtn.addEventListener("click", () => {
+      const selected = transactionListEl.selectedIndex;
+      if (selected === -1) {
+        alert("Lütfen silmek için bir işlem seçin.");
+        return;
+      }
+      if (!confirm("Seçili işlemi silmek istediğinize emin misiniz?")) return;
+
+      transactions.splice(selected, 1);
+      saveData();
+      updateUI();
+    });
+
+    // Update subcategories when type changes
+    typeEl.addEventListener("change", () => {
+      updateSubcategoryOptions();
+    });
+
+    // Set date input max to today
+    dateEl.max = new Date().toISOString().split("T")[0];
+    dateEl.value = new Date().toISOString().split("T")[0];
+
+    // Authentication
+
+    registerBtn.addEventListener("click", () => {
+      const email = emailEl.value.trim();
+      const password = passwordEl.value.trim();
+      if (!email || !password) {
+        messageEl.textContent = "E-posta ve şifre gerekli!";
+        return;
+      }
+      createUserWithEmailAndPassword(auth, email, password)
+        .then(() => {
+          messageEl.style.color = "green";
+          messageEl.textContent = "Kayıt başarılı. Giriş yapabilirsiniz.";
+        })
+        .catch((err) => {
+          messageEl.style.color = "red";
+          messageEl.textContent = "Kayıt hatası: " + err.message;
+        });
+    });
+
+    loginBtn.addEventListener("click", () => {
+      const email = emailEl.value.trim();
+      const password = passwordEl.value.trim();
+      if (!email || !password) {
+        messageEl.textContent = "E-posta ve şifre gerekli!";
+        return;
+      }
+      signInWithEmailAndPassword(auth, email, password)
+        .then(() => {
+          messageEl.textContent = "";
+        })
+        .catch((err) => {
+          messageEl.style.color = "red";
+          messageEl.textContent = "Giriş hatası: " + err.message;
+        });
+    });
+
+    logoutBtn.addEventListener("click", () => {
+      signOut(auth);
+    });
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        authContainer.classList.add("hidden");
+        appContainer.classList.remove("hidden");
+        welcomeEl.textContent = user.email + " olarak giriş yaptınız.";
+        loadData();
+        updateUI();
+      } else {
+        authContainer.classList.remove("hidden");
+        appContainer.classList.add("hidden");
+        messageEl.textContent = "";
+        transactionForm.reset();
+        transactions = [];
+        subcategories = { Gelir: [], Gider: [] };
+        saveData();
+      }
+    });
+  </script>
 </body>
 </html>
