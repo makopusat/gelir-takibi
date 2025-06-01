@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Gelir Gider Takip - Firebase Auth + Alt Kategori Seçimi</title>
+<title>Gelir Gider Takip - PDF ve Rapor</title>
 <style>
   body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f0f2f5; }
   header { background: #4a90e2; color: white; padding: 1rem; text-align: center; }
@@ -28,331 +28,6 @@
   .message { padding: 10px; background-color: #d4edda; color: #155724; margin-bottom: 15px; border-radius: 5px; display:none; }
   .error { background-color: #f8d7da; color: #721c24; }
 </style>
-
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyCTZXqmpVQeYwm2PoDwEYih9vDDl3A5rtI",
-    authDomain: "gelir-gider-d3dc3.firebaseapp.com",
-    projectId: "gelir-gider-d3dc3",
-    storageBucket: "gelir-gider-d3dc3.appspot.com",
-    messagingSenderId: "791363419549",
-    appId: "1:791363419549:web:724a349a5efcd6b7c30374"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-
-  // DOM Elements
-  const loginSection = document.getElementById('loginSection');
-  const appSection = document.getElementById('appSection');
-  const messageDiv = document.getElementById('message');
-  const errorDiv = document.getElementById('errorMessage');
-
-  const emailInput = document.getElementById('email');
-  const passwordInput = document.getElementById('password');
-  const btnLogin = document.getElementById('btnLogin');
-  const btnRegister = document.getElementById('btnRegister');
-  const btnLogout = document.getElementById('btnLogout');
-
-  const typeSelect = document.getElementById('type');
-  const categorySelect = document.getElementById('categorySelect');
-  const addCategoryInput = document.getElementById('addCategoryInput');
-  const addCategoryBtn = document.getElementById('addCategoryBtn');
-
-  const subcategorySelect = document.getElementById('subcategorySelect');
-  const addSubcategoryInput = document.getElementById('addSubcategoryInput');
-  const addSubcategoryBtn = document.getElementById('addSubcategoryBtn');
-
-  const amountInput = document.getElementById('amount');
-  const descriptionInput = document.getElementById('description');
-  const dateInput = document.getElementById('date');
-  const addEntryBtn = document.getElementById('addEntryBtn');
-
-  const entriesTable = document.getElementById('entriesTable');
-  const entriesTbody = document.getElementById('entriesTbody');
-  const totalsDiv = document.getElementById('totals');
-
-  const startDateInput = document.getElementById('startDate');
-  const endDateInput = document.getElementById('endDate');
-  const filterBtn = document.getElementById('filterBtn');
-
-  // Veri yapıları
-  let categories = ['Maaş', 'Kira', 'Market', 'Elektrik'];
-  let selectedCategories = new Set();
-
-  // Alt kategoriler obje şeklinde kategori bazında saklanacak
-  // { 'Maaş': ['Bonus', 'Aylık'], 'Kira': ['Ev', 'İşyeri'] }
-  let subcategoriesByCategory = {
-    'Maaş': ['Bonus', 'Aylık'],
-    'Kira': ['Ev', 'İşyeri'],
-    'Market': [],
-    'Elektrik': []
-  };
-
-  let entries = [];
-
-  function showMessage(text) {
-    messageDiv.textContent = text;
-    messageDiv.style.display = 'block';
-    errorDiv.style.display = 'none';
-    setTimeout(() => { messageDiv.style.display = 'none'; }, 3000);
-  }
-
-  function showError(text) {
-    errorDiv.textContent = text;
-    errorDiv.style.display = 'block';
-    messageDiv.style.display = 'none';
-    setTimeout(() => { errorDiv.style.display = 'none'; }, 4000);
-  }
-
-  // Kategori dropdown yenile
-  function loadCategories() {
-    categorySelect.innerHTML = '<option value="">Seçiniz...</option>';
-    categories.forEach(cat => {
-      if (!selectedCategories.has(cat)) {
-        const opt = document.createElement('option');
-        opt.value = cat;
-        opt.textContent = cat;
-        categorySelect.appendChild(opt);
-      }
-    });
-  }
-
-  // Alt kategori dropdown yenile (seçili kategoriye göre)
-  function loadSubcategories(cat) {
-    subcategorySelect.innerHTML = '<option value="">(Alt kategori seçiniz veya yeni ekleyin)</option>';
-    if (!cat || !subcategoriesByCategory[cat]) return;
-    subcategoriesByCategory[cat].forEach(sub => {
-      const opt = document.createElement('option');
-      opt.value = sub;
-      opt.textContent = sub;
-      subcategorySelect.appendChild(opt);
-    });
-  }
-
-  // Seçilen kategoriyi set’e ekle, dropdown’dan çıkar
-  function addSelectedCategory(cat) {
-    selectedCategories.add(cat);
-    loadCategories();
-  }
-
-  function removeSelectedCategory(cat) {
-    selectedCategories.delete(cat);
-    loadCategories();
-  }
-
-  // Tarih aralığında kontrol
-  function isDateBetween(date, start, end) {
-    if (!start && !end) return true;
-    const d = new Date(date);
-    if (start && d < new Date(start)) return false;
-    if (end && d > new Date(end)) return false;
-    return true;
-  }
-
-  // Raporlama
-  function displayEntries(filteredEntries) {
-    if (filteredEntries.length === 0) {
-      entriesTable.style.display = 'none';
-      totalsDiv.textContent = 'Kayıt bulunamadı.';
-      return;
-    }
-
-    // Grup: tür|kategori|altkategori
-    const grouped = {};
-
-    filteredEntries.forEach(entry => {
-      const sub = entry.subcategory || '-';
-      const key = `${entry.type}|${entry.category}|${sub}`;
-
-      if (!grouped[key]) {
-        grouped[key] = {
-          type: entry.type,
-          category: entry.category,
-          subcategory: sub,
-          amount: 0
-        };
-      }
-      grouped[key].amount += entry.amount;
-    });
-
-    entriesTable.style.display = 'table';
-    entriesTbody.innerHTML = '';
-
-    let totalIncome = 0;
-    let totalExpense = 0;
-
-    Object.values(grouped).forEach(entry => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${entry.type === 'gelir' ? 'Gelir' : 'Gider'}</td>
-        <td>${entry.category}</td>
-        <td>${entry.subcategory}</td>
-        <td>${entry.amount.toFixed(2)}</td>
-      `;
-      entriesTbody.appendChild(tr);
-
-      if (entry.type === 'gelir') totalIncome += entry.amount;
-      else totalExpense += entry.amount;
-    });
-
-    totalsDiv.textContent = `Toplam Gelir: ${totalIncome.toFixed(2)} ₺, Toplam Gider: ${totalExpense.toFixed(2)} ₺, Net Kar/Zarar: ${(totalIncome - totalExpense).toFixed(2)} ₺`;
-  }
-
-  // Yeni kategori ekle (manuel)
-  addCategoryBtn.addEventListener('click', () => {
-    const newCat = addCategoryInput.value.trim();
-    if (!newCat) {
-      showError('Kategori adı boş olamaz!');
-      return;
-    }
-    if (categories.includes(newCat)) {
-      showError('Bu kategori zaten mevcut!');
-      return;
-    }
-    categories.push(newCat);
-    subcategoriesByCategory[newCat] = [];
-    loadCategories();
-    addCategoryInput.value = '';
-    showMessage('Kategori eklendi.');
-  });
-
-  // Yeni alt kategori ekle (manuel, seçili kategoriye)
-  addSubcategoryBtn.addEventListener('click', () => {
-    const newSub = addSubcategoryInput.value.trim();
-    const selectedCat = categorySelect.value;
-    if (!selectedCat) {
-      showError('Lütfen önce kategori seçin!');
-      return;
-    }
-    if (!newSub) {
-      showError('Alt kategori boş olamaz!');
-      return;
-    }
-    if (!subcategoriesByCategory[selectedCat]) {
-      subcategoriesByCategory[selectedCat] = [];
-    }
-    if (subcategoriesByCategory[selectedCat].includes(newSub)) {
-      showError('Bu alt kategori zaten mevcut!');
-      return;
-    }
-    subcategoriesByCategory[selectedCat].push(newSub);
-    loadSubcategories(selectedCat);
-    addSubcategoryInput.value = '';
-    showMessage('Alt kategori eklendi.');
-  });
-
-  // Kategori seçimi değişince alt kategorileri yenile
-  categorySelect.addEventListener('change', (e) => {
-    loadSubcategories(e.target.value);
-  });
-
-  // Giriş ekle
-  addEntryBtn.addEventListener('click', () => {
-    const type = typeSelect.value;
-    const category = categorySelect.value;
-    const subcategory = subcategorySelect.value || '';
-    const amount = parseFloat(amountInput.value);
-    const description = descriptionInput.value.trim();
-    const date = dateInput.value;
-
-    if (!type) {
-      showError('Lütfen gelir veya gider seçin.');
-      return;
-    }
-    if (!category) {
-      showError('Lütfen kategori seçin.');
-      return;
-    }
-    if (!amount || amount <= 0) {
-      showError('Lütfen geçerli bir tutar girin.');
-      return;
-    }
-    if (!date) {
-      showError('Lütfen tarih seçin.');
-      return;
-    }
-
-    entries.push({ type, category, subcategory, amount, description, date });
-    showMessage('Kayıt eklendi.');
-
-    // Alanları temizle
-    amountInput.value = '';
-    descriptionInput.value = '';
-    dateInput.value = '';
-
-    // Filtreye göre göster
-    applyFilter();
-  });
-
-  // Filtrele ve göster
-  function applyFilter() {
-    const start = startDateInput.value;
-    const end = endDateInput.value;
-    const filtered = entries.filter(e => isDateBetween(e.date, start, end));
-    displayEntries(filtered);
-  }
-
-  filterBtn.addEventListener('click', applyFilter);
-
-  // Firebase Auth işlemleri
-
-  btnLogin.addEventListener('click', () => {
-    const email = emailInput.value.trim();
-    const password = passwordInput.value.trim();
-    if (!email || !password) {
-      showError('Email ve şifre boş olamaz!');
-      return;
-    }
-    signInWithEmailAndPassword(auth, email, password)
-      .then(() => {
-        showMessage('Giriş başarılı!');
-      })
-      .catch(err => showError('Giriş başarısız: ' + err.message));
-  });
-
-  btnRegister.addEventListener('click', () => {
-    const email = emailInput.value.trim();
-    const password = passwordInput.value.trim();
-    if (!email || !password) {
-      showError('Email ve şifre boş olamaz!');
-      return;
-    }
-    createUserWithEmailAndPassword(auth, email, password)
-      .then(() => showMessage('Kayıt başarılı! Giriş yapabilirsiniz.'))
-      .catch(err => showError('Kayıt başarısız: ' + err.message));
-  });
-
-  btnLogout.addEventListener('click', () => {
-    signOut(auth).then(() => {
-      showMessage('Çıkış yapıldı.');
-    });
-  });
-
-  // Oturum durumu kontrolü
-  onAuthStateChanged(auth, user => {
-    if (user) {
-      loginSection.classList.add('hidden');
-      appSection.classList.remove('hidden');
-      loadCategories();
-      applyFilter();
-    } else {
-      loginSection.classList.remove('hidden');
-      appSection.classList.add('hidden');
-    }
-  });
-
-  // Sayfa yüklendiğinde tarih default
-  window.onload = () => {
-    const today = new Date().toISOString().substring(0, 10);
-    dateInput.value = today;
-    startDateInput.value = '';
-    endDateInput.value = '';
-  }
-</script>
 </head>
 <body>
 
@@ -360,19 +35,7 @@
   <h1>Gelir Gider Takip Sistemi</h1>
 </header>
 
-<section id="loginSection">
-  <h2>Giriş / Kayıt</h2>
-  <input type="email" id="email" placeholder="Email" />
-  <input type="password" id="password" placeholder="Şifre" />
-  <button id="btnLogin">Giriş Yap</button>
-  <button id="btnRegister">Kayıt Ol</button>
-  <div id="message" class="message"></div>
-  <div id="errorMessage" class="message error"></div>
-</section>
-
-<section id="appSection" class="hidden">
-  <button id="btnLogout" style="float:right; margin-bottom: 10px;">Çıkış Yap</button>
-
+<section id="appSection">
   <h2>Gelir/Gider Kaydı Ekle</h2>
   <label for="type">Tür:</label>
   <select id="type">
@@ -412,6 +75,7 @@
   <label for="endDate">Bitiş Tarihi:</label>
   <input type="date" id="endDate" />
   <button id="filterBtn">Filtrele</button>
+  <button id="exportPdfBtn" style="background-color:#28a745; margin-top: 10px;">PDF Olarak İndir</button>
 
   <table id="entriesTable" style="display:none;">
     <thead>
@@ -425,7 +89,257 @@
     <tbody id="entriesTbody"></tbody>
   </table>
   <div id="totals"></div>
+
+  <div id="message" class="message"></div>
+  <div id="errorMessage" class="message error"></div>
 </section>
+
+<script>
+  // Başlangıç veri yapıları ve DOM referansları
+  let categories = ['Maaş', 'Kira', 'Market', 'Elektrik'];
+  let subcategoriesByCategory = {
+    'Maaş': ['Bonus', 'Aylık'],
+    'Kira': ['Ev', 'İşyeri'],
+    'Market': [],
+    'Elektrik': []
+  };
+  let entries = [];
+
+  const typeSelect = document.getElementById('type');
+  const categorySelect = document.getElementById('categorySelect');
+  const addCategoryInput = document.getElementById('addCategoryInput');
+  const addCategoryBtn = document.getElementById('addCategoryBtn');
+
+  const subcategorySelect = document.getElementById('subcategorySelect');
+  const addSubcategoryInput = document.getElementById('addSubcategoryInput');
+  const addSubcategoryBtn = document.getElementById('addSubcategoryBtn');
+
+  const amountInput = document.getElementById('amount');
+  const descriptionInput = document.getElementById('description');
+  const dateInput = document.getElementById('date');
+  const addEntryBtn = document.getElementById('addEntryBtn');
+
+  const entriesTable = document.getElementById('entriesTable');
+  const entriesTbody = document.getElementById('entriesTbody');
+  const totalsDiv = document.getElementById('totals');
+
+  const startDateInput = document.getElementById('startDate');
+  const endDateInput = document.getElementById('endDate');
+  const filterBtn = document.getElementById('filterBtn');
+  const exportPdfBtn = document.getElementById('exportPdfBtn');
+
+  const messageDiv = document.getElementById('message');
+  const errorDiv = document.getElementById('errorMessage');
+
+  function showMessage(text) {
+    messageDiv.textContent = text;
+    messageDiv.style.display = 'block';
+    errorDiv.style.display = 'none';
+    setTimeout(() => { messageDiv.style.display = 'none'; }, 3000);
+  }
+
+  function showError(text) {
+    errorDiv.textContent = text;
+    errorDiv.style.display = 'block';
+    messageDiv.style.display = 'none';
+    setTimeout(() => { errorDiv.style.display = 'none'; }, 4000);
+  }
+
+  function loadCategories() {
+    categorySelect.innerHTML = '<option value="">Seçiniz...</option>';
+    categories.forEach(cat => {
+      const opt = document.createElement('option');
+      opt.value = cat;
+      opt.textContent = cat;
+      categorySelect.appendChild(opt);
+    });
+  }
+
+  function loadSubcategories(cat) {
+    subcategorySelect.innerHTML = '<option value="">(Alt kategori seçiniz veya yeni ekleyin)</option>';
+    if (!cat || !subcategoriesByCategory[cat]) return;
+    subcategoriesByCategory[cat].forEach(sub => {
+      const opt = document.createElement('option');
+      opt.value = sub;
+      opt.textContent = sub;
+      subcategorySelect.appendChild(opt);
+    });
+  }
+
+  categorySelect.addEventListener('change', () => {
+    loadSubcategories(categorySelect.value);
+  });
+
+  addCategoryBtn.addEventListener('click', () => {
+    const newCat = addCategoryInput.value.trim();
+    if (!newCat) {
+      showError('Kategori adı boş olamaz!');
+      return;
+    }
+    if (categories.includes(newCat)) {
+      showError('Bu kategori zaten mevcut!');
+      return;
+    }
+    categories.push(newCat);
+    subcategoriesByCategory[newCat] = [];
+    loadCategories();
+    addCategoryInput.value = '';
+    showMessage('Kategori eklendi.');
+  });
+
+  addSubcategoryBtn.addEventListener('click', () => {
+    const newSub = addSubcategoryInput.value.trim();
+    const selectedCat = categorySelect.value;
+    if (!selectedCat) {
+      showError('Lütfen önce kategori seçin!');
+      return;
+    }
+    if (!newSub) {
+      showError('Alt kategori boş olamaz!');
+      return;
+    }
+    if (!subcategoriesByCategory[selectedCat]) {
+      subcategoriesByCategory[selectedCat] = [];
+    }
+    if (subcategoriesByCategory[selectedCat].includes(newSub)) {
+      showError('Bu alt kategori zaten mevcut!');
+      return;
+    }
+    subcategoriesByCategory[selectedCat].push(newSub);
+    loadSubcategories(selectedCat);
+    addSubcategoryInput.value = '';
+    showMessage('Alt kategori eklendi.');
+  });
+
+  addEntryBtn.addEventListener('click', () => {
+    const type = typeSelect.value;
+    const category = categorySelect.value;
+    const subcategory = subcategorySelect.value || '';
+    const amount = parseFloat(amountInput.value);
+    const description = descriptionInput.value.trim();
+    const date = dateInput.value;
+
+    if (!type) {
+      showError('Lütfen gelir veya gider seçin.');
+      return;
+    }
+    if (!category) {
+      showError('Lütfen kategori seçin.');
+      return;
+    }
+    if (!amount || amount <= 0) {
+      showError('Lütfen geçerli bir tutar girin.');
+      return;
+    }
+    if (!date) {
+      showError('Lütfen tarih seçin.');
+      return;
+    }
+
+    entries.push({ type, category, subcategory, amount, description, date });
+    showMessage('Kayıt eklendi.');
+
+    amountInput.value = '';
+    descriptionInput.value = '';
+    dateInput.value = new Date().toISOString().substring(0,10); // bugünün tarihi
+
+    applyFilter();
+  });
+
+  function isDateBetween(date, start, end) {
+    if (!date) return false;
+    const d = new Date(date);
+    if (start && d < new Date(start)) return false;
+    if (end && d > new Date(end)) return false;
+    return true;
+  }
+
+  function displayEntries(entriesToShow) {
+    entriesTbody.innerHTML = '';
+    if (entriesToShow.length === 0) {
+      entriesTable.style.display = 'none';
+      totalsDiv.textContent = 'Gösterilecek kayıt bulunamadı.';
+      return;
+    }
+
+    entriesTable.style.display = 'table';
+
+    let totalIncome = 0;
+    let totalExpense = 0;
+
+    entriesToShow.forEach(entry => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${entry.type}</td>
+        <td>${entry.category}</td>
+        <td>${entry.subcategory || '-'}</td>
+        <td>${entry.amount.toFixed(2)}</td>
+      `;
+      entriesTbody.appendChild(tr);
+
+      if (entry.type === 'gelir') totalIncome += entry.amount;
+      else totalExpense += entry.amount;
+    });
+
+    totalsDiv.textContent = `Toplam Gelir: ${totalIncome.toFixed(2)} ₺, Toplam Gider: ${totalExpense.toFixed(2)} ₺, Net Kar/Zarar: ${(totalIncome - totalExpense).toFixed(2)} ₺`;
+  }
+
+  function applyFilter() {
+    const start = startDateInput.value;
+    const end = endDateInput.value;
+    const filtered = entries.filter(e => isDateBetween(e.date, start, end));
+    displayEntries(filtered);
+  }
+
+  filterBtn.addEventListener('click', applyFilter);
+
+  // PDF indir butonu fonksiyonu için jsPDF kullanacağız
+  // jsPDF CDN eklemediğimiz için buraya basit bir dışa aktarma fonksiyonu yazalım:
+
+  exportPdfBtn.addEventListener('click', () => {
+    if (entries.length === 0) {
+      showError('PDF oluşturmak için kayıt yok.');
+      return;
+    }
+    let content = `Gelir Gider Raporu\n\n`;
+    content += `Tür\tKategori\tAlt Kategori\tTutar (₺)\n`;
+
+    const start = startDateInput.value;
+    const end = endDateInput.value;
+    const filtered = entries.filter(e => isDateBetween(e.date, start, end));
+
+    filtered.forEach(e => {
+      content += `${e.type}\t${e.category}\t${e.subcategory || '-'}\t${e.amount.toFixed(2)}\n`;
+    });
+
+    let totalIncome = 0;
+    let totalExpense = 0;
+    filtered.forEach(e => {
+      if (e.type === 'gelir') totalIncome += e.amount;
+      else totalExpense += e.amount;
+    });
+
+    content += `\nToplam Gelir: ${totalIncome.toFixed(2)} ₺\n`;
+    content += `Toplam Gider: ${totalExpense.toFixed(2)} ₺\n`;
+    content += `Net Kar/Zarar: ${(totalIncome - totalExpense).toFixed(2)} ₺\n`;
+
+    // Basit olarak TXT formatında indirme yapacağız:
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'gelir-gider-raporu.txt';
+    link.click();
+    URL.revokeObjectURL(link.href);
+  });
+
+  // Sayfa yüklendiğinde
+  window.onload = () => {
+    loadCategories();
+    categorySelect.dispatchEvent(new Event('change'));
+    dateInput.value = new Date().toISOString().substring(0,10);
+    applyFilter();
+  };
+</script>
 
 </body>
 </html>
