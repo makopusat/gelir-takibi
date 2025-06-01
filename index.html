@@ -1,80 +1,63 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Banka ve Gelir-Gider Raporu</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            font-size: 18px;
-            margin: 20px;
-        }
-
-        h2, h3, h4 {
-            font-size: 24px;
-            text-align: center;
-        }
-
-        label, button, select, input {
-            font-size: 18px;
-            margin: 10px 0;
-            padding: 10px;
-        }
-
-        input[type="number"], input[type="text"], input[type="date"], select {
-            width: 100%;
-            font-size: 18px;
-            padding: 10px;
-            margin-top: 5px;
-        }
-
-        ul {
-            list-style-type: none;
-            padding: 0;
-            font-size: 18px;
-        }
-
-        li {
-            padding: 10px;
-            border-bottom: 1px solid #ddd;
-        }
-
-        button {
-            cursor: pointer;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            padding: 15px 20px;
-            font-size: 20px;
-        }
-
-        button:hover {
-            background-color: #45a049;
-        }
-
-        #appSection {
-            width: 80%;
-            margin: 0 auto;
-        }
-
-        #filterSection {
-            margin-top: 20px;
-            padding: 20px;
-            background-color: #f4f4f4;
-            border-radius: 5px;
-            display: none;
-        }
-
-        #reportSection {
-            margin-top: 20px;
-            padding: 20px;
-            background-color: #f9f9f9;
-            border-radius: 5px;
-            display: none;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Banka ve Gelir-Gider Raporu</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 18px;
+      margin: 20px;
+    }
+    h2, h3, h4 {
+      font-size: 24px;
+      text-align: center;
+    }
+    label, button, select, input {
+      font-size: 18px;
+      margin: 10px 0;
+      padding: 10px;
+    }
+    input[type="number"], input[type="text"], input[type="date"], select {
+      width: 100%;
+      font-size: 18px;
+      padding: 10px;
+      margin-top: 5px;
+    }
+    ul {
+      list-style-type: none;
+      padding: 0;
+      font-size: 18px;
+    }
+    li {
+      padding: 10px;
+      border-bottom: 1px solid #ddd;
+    }
+    button {
+      cursor: pointer;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      padding: 15px 20px;
+      font-size: 20px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    #appSection {
+      width: 80%;
+      margin: 0 auto;
+    }
+    #filterSection, #reportSection {
+      margin-top: 20px;
+      padding: 20px;
+      background-color: #f4f4f4;
+      border-radius: 5px;
+      display: none;
+    }
+  </style>
 </head>
 <body>
 
@@ -82,280 +65,241 @@
 
 <!-- Kullanıcı Girişi -->
 <div id="loginSection">
-    <h3>Kullanıcı Girişi</h3>
-    <label for="loginUsername">Kullanıcı Adı:</label>
-    <input type="text" id="loginUsername" placeholder="Kullanıcı adı girin">
-    <label for="loginPassword">Şifre:</label>
-    <input type="password" id="loginPassword" placeholder="Şifre girin">
-    <button onclick="login()">Giriş Yap</button>
-    <button onclick="registerUser()">Üye Ol</button>
-    <button onclick="forgotPassword()">Şifre Unuttum</button>
+  <h3>Kullanıcı Girişi</h3>
+  <label for="loginUsername">Kullanıcı Adı:</label>
+  <input type="text" id="loginUsername" placeholder="Kullanıcı adı girin">
+  <label for="loginPassword">Şifre:</label>
+  <input type="password" id="loginPassword" placeholder="Şifre girin">
+  <button onclick="login()">Giriş Yap</button>
+  <button onclick="registerUser()">Üye Ol</button>
+  <button onclick="forgotPassword()">Şifre Unuttum</button>
 </div>
 
-<!-- Banka ekleme alanı -->
-<div id="bankSection">
+<!-- Uygulama Bölümü -->
+<div id="appSection" style="display: none;">
+
+  <!-- Banka Ekleme -->
+  <div id="bankSection">
     <label for="bank">Banka Seçin:</label>
-    <select id="bank">
-        <!-- Dinamik olarak eklenen bankalar buraya eklenecek -->
-    </select>
+    <select id="bank"></select>
     <button onclick="addBank()">Banka Ekle</button>
-    <button onclick="deleteBank()">Banka Sil</button> <!-- <-- Buraya eklendi -->
+    <button onclick="deleteBank()">Banka Sil</button>
     <input type="text" id="newBankName" placeholder="Yeni banka adı" style="display: none;">
-</div>
+  </div>
 
-    <div>
-        <label for="amount">Tutar:</label>
-        <input type="number" id="amount" placeholder="Tutar girin">
-    </div>
+  <!-- Gelir-Gider Girişi -->
+  <div>
+    <label for="amount">Tutar:</label>
+    <input type="number" id="amount" placeholder="Tutar girin">
+  </div>
+  <div>
+    <label for="description">Açıklama:</label>
+    <input type="text" id="description" placeholder="Açıklama girin">
+  </div>
+  <button onclick="addTransaction(true)">Gelir Ekle</button>
+  <button onclick="addTransaction(false)">Gider Ekle</button>
 
-    <div>
-        <label for="description">Açıklama:</label>
-        <input type="text" id="description" placeholder="Açıklama girin">
-    </div>
+  <!-- Kar Durumu -->
+  <h3>Toplam Kar: <span id="totalProfit">0</span></h3>
 
-    <button onclick="addTransaction(true)">Gelir Ekle</button>
-    <button onclick="addTransaction(false)">Gider Ekle</button>
+  <!-- Rapor -->
+  <h3>Rapor Görüntüle</h3>
+  <button onclick="showReportFilters()">Raporu Göster</button>
+  <button onclick="logout()">Çıkış Yap</button>
 
-    <h3>Toplam Kar: <span id="totalProfit">0</span></h3>
+  <div id="filterSection">
+    <label for="startDate">Başlangıç Tarihi:</label>
+    <input type="date" id="startDate">
+    <label for="endDate">Bitiş Tarihi:</label>
+    <input type="date" id="endDate">
+    <label for="incomeExpenseFilter">Gelir/Gider Seçimi:</label>
+    <select id="incomeExpenseFilter">
+      <option value="">Hepsi</option>
+      <option value="Gelir">Gelir</option>
+      <option value="Gider">Gider</option>
+    </select>
+    <label for="bankFilter">Banka Seçimi:</label>
+    <select id="bankFilter">
+      <option value="">Hepsi</option>
+    </select>
+    <button onclick="generateReport()">Raporu Göster</button>
+  </div>
 
-    <h3>Rapor Görüntüle</h3>
-    <button onclick="showReportFilters()">Raporu Göster</button>
-
-    <button onclick="logout()">Çıkış Yap</button>
-
-    <div id="reportSection" style="display: none;">
-        <h3>Rapor Sonuçları:</h3>
-        <ul id="reportList"></ul>
-        <h4>Toplam Gelir/Gider: <span id="reportTotal"></span></h4>
-        <h4>Kar/Zarar Oranı: <span id="profitLossPercentage"></span></h4>
-    </div>
-
-    <div id="filterSection" style="display: none;">
-        <label for="startDate">Başlangıç Tarihi:</label>
-        <input type="date" id="startDate">
-        <label for="endDate">Bitiş Tarihi:</label>
-        <input type="date" id="endDate">
-
-        <label for="incomeExpenseFilter">Gelir/Gider Seçimi:</label>
-        <select id="incomeExpenseFilter">
-            <option value="">Hepsi</option>
-            <option value="Gelir">Gelir</option>
-            <option value="Gider">Gider</option>
-        </select>
-
-        <label for="bankFilter">Banka Seçimi:</label>
-        <select id="bankFilter">
-            <option value="">Hepsi</option>
-        </select>
-
-        <button onclick="generateReport()">Raporu Göster</button>
-    </div>
+  <div id="reportSection">
+    <h3>Rapor Sonuçları:</h3>
+    <ul id="reportList"></ul>
+    <h4>Toplam Gelir/Gider: <span id="reportTotal"></span></h4>
+    <h4>Kar/Zarar Oranı: <span id="profitLossPercentage"></span></h4>
+  </div>
 </div>
 
 <script>
-    let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
-    let users = JSON.parse(localStorage.getItem('users')) || [];
-    let banks = JSON.parse(localStorage.getItem('banks')) || [];
-    let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
+  let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+  let users = JSON.parse(localStorage.getItem('users')) || [];
+  let banks = JSON.parse(localStorage.getItem('banks')) || [];
+  let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
 
-    // Kullanıcı girişi işlemi
-    function login() {
-        let username = document.getElementById('loginUsername').value.trim();
-        let password = document.getElementById('loginPassword').value.trim();
-
-        let user = users.find(u => u.username === username && u.password === password);
-
-        if (user) {
-            currentUser = user;
-            localStorage.setItem('currentUser', JSON.stringify(currentUser)); // Giriş yapan kullanıcıyı kaydediyoruz
-            alert("Başarıyla giriş yaptınız!");
-            toggleSections();
-        } else {
-            alert("Kullanıcı adı veya şifre hatalı.");
-        }
+  function login() {
+    let username = document.getElementById('loginUsername').value.trim();
+    let password = document.getElementById('loginPassword').value.trim();
+    let user = users.find(u => u.username === username && u.password === password);
+    if (user) {
+      currentUser = user;
+      localStorage.setItem('currentUser', JSON.stringify(currentUser));
+      alert("Başarıyla giriş yaptınız!");
+      toggleSections();
+    } else {
+      alert("Kullanıcı adı veya şifre hatalı.");
     }
+  }
 
-    // Üye olma işlemi
-    function registerUser() {
-        let username = prompt("Kullanıcı Adı:");
-        let password = prompt("Şifre:");
-
-        if (users.some(user => user.username === username)) {
-            alert("Bu kullanıcı adı zaten mevcut.");
-        } else {
-            users.push({ username, password });
-            localStorage.setItem('users', JSON.stringify(users));
-            alert("Kayıt başarılı! Giriş yapabilirsiniz.");
-        }
+  function registerUser() {
+    let username = prompt("Kullanıcı Adı:");
+    let password = prompt("Şifre:");
+    if (users.some(user => user.username === username)) {
+      alert("Bu kullanıcı adı zaten mevcut.");
+    } else {
+      users.push({ username, password });
+      localStorage.setItem('users', JSON.stringify(users));
+      alert("Kayıt başarılı! Giriş yapabilirsiniz.");
     }
+  }
 
-    // Şifre sıfırlama işlemi
-    function forgotPassword() {
-        let username = prompt("Kullanıcı Adınızı Girin:");
-        let user = users.find(u => u.username === username);
-
-        if (user) {
-            let newPassword = prompt("Yeni şifrenizi girin:");
-            user.password = newPassword;
-            localStorage.setItem('users', JSON.stringify(users));
-            alert("Şifreniz başarıyla güncellendi!");
-        } else {
-            alert("Kullanıcı bulunamadı.");
-        }
+  function forgotPassword() {
+    let username = prompt("Kullanıcı Adınızı Girin:");
+    let user = users.find(u => u.username === username);
+    if (user) {
+      let newPassword = prompt("Yeni şifrenizi girin:");
+      user.password = newPassword;
+      localStorage.setItem('users', JSON.stringify(users));
+      alert("Şifreniz başarıyla güncellendi!");
+    } else {
+      alert("Kullanıcı bulunamadı.");
     }
+  }
 
-    // Banka ekleme
-    function addBank() {
-        let newBankNameInput = document.getElementById("newBankName");
-        newBankNameInput.style.display = newBankNameInput.style.display === "none" ? "block" : "none";
-
-        if (newBankNameInput.style.display === "block") {
-            newBankNameInput.focus();
-        } else {
-            let newBankName = newBankNameInput.value.trim();
-            if (newBankName) {
-                banks.push(newBankName);
-                localStorage.setItem('banks', JSON.stringify(banks));
-                let bankSelect = document.getElementById("bank");
-                let newOption = document.createElement("option");
-                newOption.value = newBankName;
-                newOption.textContent = newBankName;
-                bankSelect.appendChild(newOption);
-                newBankNameInput.value = "";
-                alert("Yeni banka eklendi!");
-            }
-        }
+  function addBank() {
+    let input = document.getElementById("newBankName");
+    input.style.display = input.style.display === "none" ? "block" : "none";
+    if (input.style.display === "block") {
+      input.focus();
+    } else {
+      let name = input.value.trim();
+      if (name) {
+        banks.push(name);
+        localStorage.setItem('banks', JSON.stringify(banks));
+        input.value = "";
+        loadBankOptions();
+        alert("Yeni banka eklendi!");
+      }
     }
+  }
 
-    // UI'yi güncelle
-    function updateUI() {
-        let totalProfit = transactions.reduce((sum, t) => sum + (t.type === "Gelir" ? t.amount : -t.amount), 0);
-        document.getElementById("totalProfit").textContent = totalProfit;
-    }
+  function deleteBank() {
+    let bankSelect = document.getElementById("bank");
+    let selectedBank = bankSelect.value;
+    if (!selectedBank) return alert("Silmek için bir banka seçin.");
+    if (!confirm(`${selectedBank} bankasını silmek istediğinize emin misiniz?`)) return;
+    banks = banks.filter(b => b !== selectedBank);
+    localStorage.setItem('banks', JSON.stringify(banks));
+    loadBankOptions();
+    alert(`${selectedBank} başarıyla silindi.`);
+  }
 
-    // İşlem ekleme
-    function addTransaction(isIncome) {
-        let amountInput = document.getElementById("amount");
-        let descriptionInput = document.getElementById("description");
-        let bankSelect = document.getElementById("bank");
+  function addTransaction(isIncome) {
+    let amount = parseFloat(document.getElementById("amount").value.trim());
+    let description = document.getElementById("description").value.trim();
+    let bank = document.getElementById("bank").value;
+    if (!amount) return alert("Lütfen tutar girin");
+    transactions.push({
+      date: new Date().toISOString().split('T')[0],
+      amount,
+      description,
+      type: isIncome ? "Gelir" : "Gider",
+      bank
+    });
+    localStorage.setItem('transactions', JSON.stringify(transactions));
+    document.getElementById("amount").value = "";
+    document.getElementById("description").value = "";
+    updateUI();
+    alert("İşlem başarıyla kaydedildi!");
+  }
 
-        let amount = amountInput.value.trim();
-        let description = descriptionInput.value.trim();
-        let bank = bankSelect.value;
+  function updateUI() {
+    let total = transactions.reduce((sum, t) => sum + (t.type === "Gelir" ? t.amount : -t.amount), 0);
+    document.getElementById("totalProfit").textContent = total;
+  }
 
-        if (!amount) return alert("Lütfen tutar girin");
+  function toggleSections() {
+    document.getElementById("loginSection").style.display = currentUser ? "none" : "block";
+    document.getElementById("appSection").style.display = currentUser ? "block" : "none";
+    if (currentUser) loadBankOptions();
+  }
 
-        let transaction = {
-            date: new Date().toISOString().split('T')[0],
-            amount: parseFloat(amount),
-            description: description,
-            type: isIncome ? "Gelir" : "Gider",
-            bank: bank
-        };
+  function loadBankOptions() {
+    let bankSelect = document.getElementById("bank");
+    let bankFilter = document.getElementById("bankFilter");
+    bankSelect.innerHTML = "";
+    bankFilter.innerHTML = "<option value=''>Hepsi</option>";
+    banks.forEach(bank => {
+      let opt1 = document.createElement("option");
+      opt1.value = opt1.textContent = bank;
+      bankSelect.appendChild(opt1);
+      let opt2 = document.createElement("option");
+      opt2.value = opt2.textContent = bank;
+      bankFilter.appendChild(opt2);
+    });
+  }
 
-        transactions.push(transaction);
-        localStorage.setItem('transactions', JSON.stringify(transactions));
+  function showReportFilters() {
+    document.getElementById("filterSection").style.display = "block";
+    document.getElementById("reportSection").style.display = "none";
+  }
 
-        // Formu sıfırlama
-        amountInput.value = "";
-        descriptionInput.value = "";
+  function generateReport() {
+    let start = new Date(document.getElementById("startDate").value);
+    let end = new Date(document.getElementById("endDate").value);
+    let typeFilter = document.getElementById("incomeExpenseFilter").value;
+    let bankFilter = document.getElementById("bankFilter").value;
 
-        updateUI();
-        alert("İşlem başarıyla kaydedildi!");
-    }
+    if (!start || !end) return alert("Başlangıç ve bitiş tarihlerini girin.");
 
-    // Çıkış yapma
-    function logout() {
-        currentUser = null;
-        localStorage.removeItem('currentUser');
-        toggleSections();
-        alert("Çıkış yapıldı.");
-    }
+    let results = transactions.filter(t => {
+      let date = new Date(t.date);
+      return date >= start &&
+             date <= end &&
+             (!typeFilter || t.type === typeFilter) &&
+             (!bankFilter || t.bank === bankFilter);
+    });
 
-    // Sekmeleri kontrol et ve doğru sekmeyi göster
-    function toggleSections() {
-        if (currentUser) {
-            document.getElementById("loginSection").style.display = "none";
-            document.getElementById("appSection").style.display = "block";
-            loadBankOptions();
-        } else {
-            document.getElementById("loginSection").style.display = "block";
-            document.getElementById("appSection").style.display = "none";
-        }
-    }
+    let reportList = document.getElementById("reportList");
+    reportList.innerHTML = "";
+    results.forEach(t => {
+      let li = document.createElement("li");
+      li.textContent = `${t.date} - ${t.type}: ${t.amount} TL - Banka: ${t.bank} - Açıklama: ${t.description}`;
+      reportList.appendChild(li);
+    });
 
-    // Banka seçeneklerini yükle
-    function loadBankOptions() {
-        let bankSelect = document.getElementById("bank");
-        bankSelect.innerHTML = ""; // Mevcut seçenekleri temizle
+    let totalIncome = results.filter(t => t.type === "Gelir").reduce((sum, t) => sum + t.amount, 0);
+    let totalExpense = results.filter(t => t.type === "Gider").reduce((sum, t) => sum + t.amount, 0);
+    let total = totalIncome - totalExpense;
+    let percent = (totalIncome || totalExpense) ? (total / totalIncome * 100) : 0;
 
-        banks.forEach(bank => {
-            let newOption = document.createElement("option");
-            newOption.value = bank;
-            newOption.textContent = bank;
-            bankSelect.appendChild(newOption);
-        });
-    }
+    document.getElementById("reportTotal").textContent = `${totalIncome} TL Gelir, ${totalExpense} TL Gider, Toplam: ${total} TL`;
+    document.getElementById("profitLossPercentage").textContent = `${percent.toFixed(2)}%`;
 
-    // Raporu filtreleme ve gösterme
-    function showReportFilters() {
-        document.getElementById("filterSection").style.display = "block";
-        document.getElementById("reportSection").style.display = "none";  // Raporu gizle
-    }
+    document.getElementById("filterSection").style.display = "none";
+    document.getElementById("reportSection").style.display = "block";
+  }
 
-    // Tarih aralığına göre rapor üretme
-    function generateReport() {
-        let startDate = document.getElementById("startDate").value;
-        let endDate = document.getElementById("endDate").value;
-        let incomeExpenseFilter = document.getElementById("incomeExpenseFilter").value;
-        let bankFilter = document.getElementById("bankFilter").value;
-
-        if (!startDate || !endDate) {
-            alert("Başlangıç ve bitiş tarihlerini girin.");
-            return;
-        }
-
-        // Tarih aralığını Date objesine dönüştür
-        let start = new Date(startDate);
-        let end = new Date(endDate);
-
-        // Filtrelenmiş işlemleri al
-        let filteredTransactions = transactions.filter(t => {
-            let transactionDate = new Date(t.date);
-            let isInDateRange = transactionDate >= start && transactionDate <= end;
-            let matchesIncomeExpense = !incomeExpenseFilter || t.type === incomeExpenseFilter;
-            let matchesBank = !bankFilter || t.bank === bankFilter;
-
-            return isInDateRange && matchesIncomeExpense && matchesBank;
-        });
-
-        // Raporu oluştur
-        let reportList = document.getElementById("reportList");
-        reportList.innerHTML = "";
-
-        filteredTransactions.forEach(t => {
-            let listItem = document.createElement("li");
-            listItem.textContent = `${t.date} - ${t.type}: ${t.amount} TL - Banka: ${t.bank} - Açıklama: ${t.description}`;
-            reportList.appendChild(listItem);
-        });
-
-        // Toplam geliri ve gideri hesapla
-        let totalIncome = filteredTransactions.filter(t => t.type === "Gelir").reduce((sum, t) => sum + t.amount, 0);
-        let totalExpense = filteredTransactions.filter(t => t.type === "Gider").reduce((sum, t) => sum + t.amount, 0);
-
-        let total = totalIncome - totalExpense;
-        let profitLoss = (totalIncome !== 0 || totalExpense !== 0) ? (total / totalIncome * 100) : 0;
-
-        // Sonuçları ekle
-        document.getElementById("reportTotal").textContent = `${totalIncome} TL Gelir, ${totalExpense} TL Gider, Toplam: ${total} TL`;
-        document.getElementById("profitLossPercentage").textContent = `${profitLoss.toFixed(2)}%`;
-
-        document.getElementById("filterSection").style.display = "none"; // Filtreyi gizle
-        document.getElementById("reportSection").style.display = "block"; // Raporu göster
-    }
-
-    // Sayfa yüklendiğinde UI'yi kontrol et
+  function logout() {
+    currentUser = null;
+    localStorage.removeItem('currentUser');
     toggleSections();
+    alert("Çıkış yapıldı.");
+  }
+
+  toggleSections();
 </script>
 
 </body>
