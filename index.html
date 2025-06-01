@@ -8,47 +8,64 @@
     label, select, input, button { margin: 5px 0; display: block; }
     ul li { margin: 6px 0; cursor: pointer; }
     button { padding: 4px 8px; }
+    .section { margin-bottom: 20px; border: 1px solid #ccc; padding: 10px; border-radius: 8px; }
   </style>
 </head>
 <body>
   <h2>Gelir/Gider Takip Sistemi</h2>
 
-  <form id="transactionForm">
-    <label for="type">Tür:</label>
-    <select id="type" required>
-      <option value="Gelir">Gelir</option>
-      <option value="Gider">Gider</option>
-    </select>
+  <div class="section">
+    <form id="transactionForm">
+      <label for="type">Tür:</label>
+      <select id="type" required>
+        <option value="Gelir">Gelir</option>
+        <option value="Gider">Gider</option>
+      </select>
 
-    <label for="amount">Tutar:</label>
-    <input type="number" id="amount" required>
+      <label for="amount">Tutar:</label>
+      <input type="number" id="amount" required>
 
-    <label for="bank">Banka:</label>
-    <select id="bank" required>
-      <option value="">Seçiniz</option>
-      <option value="Ziraat Bankası">Ziraat Bankası</option>
-      <option value="İş Bankası">İş Bankası</option>
-      <option value="Garanti BBVA">Garanti BBVA</option>
-      <option value="Yapı Kredi">Yapı Kredi</option>
-    </select>
+      <label for="bank">Banka:</label>
+      <select id="bank" required>
+        <option value="">Seçiniz</option>
+        <option value="Ziraat Bankası">Ziraat Bankası</option>
+        <option value="İş Bankası">İş Bankası</option>
+        <option value="Garanti BBVA">Garanti BBVA</option>
+        <option value="Yapı Kredi">Yapı Kredi</option>
+      </select>
 
-    <label for="description">Açıklama:</label>
-    <input type="text" id="description" required>
+      <label for="description">Açıklama:</label>
+      <input type="text" id="description" required>
 
-    <label for="date">Tarih:</label>
-    <input type="date" id="date" required>
+      <label for="date">Tarih:</label>
+      <input type="date" id="date" required>
 
-    <button type="submit" id="addBtn">Ekle</button>
-    <button type="button" id="editBtn" style="display: none;">Kaydet</button>
-  </form>
+      <button type="submit" id="addBtn">Ekle</button>
+      <button type="button" id="editBtn" style="display: none;">Kaydet</button>
+    </form>
+  </div>
 
-  <h3>Toplam Kar: <span id="totalProfit">0</span> TL</h3>
+  <div class="section">
+    <h3>İşlem Listesi</h3>
+    <select id="transactionList" size="8" style="width: 100%;"></select>
+    <button onclick="editSelected()">Düzenle</button>
+    <button onclick="deleteSelected()" style="background:red;color:white;">Sil</button>
+    <h4>Toplam Kar: <span id="totalProfit">0</span> TL</h4>
+  </div>
 
-  <h4>İşlem Listesi</h4>
-  <select id="transactionList" size="8" style="width: 100%;"></select>
+  <div class="section">
+    <h3>Raporlama</h3>
+    <label for="startDate">Başlangıç Tarihi:</label>
+    <input type="date" id="startDate">
 
-  <button onclick="editSelected()">Düzenle</button>
-  <button onclick="deleteSelected()" style="background:red;color:white;">Sil</button>
+    <label for="endDate">Bitiş Tarihi:</label>
+    <input type="date" id="endDate">
+
+    <button onclick="filterByDate()">Raporla</button>
+
+    <h4>Filtrelenmiş Toplam Kar: <span id="filteredProfit">0</span> TL</h4>
+    <ul id="filteredResults"></ul>
+  </div>
 
   <script>
     let transactions = JSON.parse(localStorage.getItem("transactions")) || [];
@@ -65,7 +82,6 @@
         option.value = i;
         option.text = `${t.date} - ${t.type}: ${t.amount} TL - ${t.bank} - ${t.description}`;
         list.appendChild(option);
-
         total += t.type === "Gelir" ? t.amount : -t.amount;
       });
 
@@ -138,6 +154,37 @@
       transactions.splice(selected, 1);
       localStorage.setItem("transactions", JSON.stringify(transactions));
       updateUI();
+    }
+
+    function filterByDate() {
+      const start = document.getElementById("startDate").value;
+      const end = document.getElementById("endDate").value;
+
+      if (!start || !end) {
+        alert("Lütfen başlangıç ve bitiş tarihlerini giriniz.");
+        return;
+      }
+
+      const startDate = new Date(start);
+      const endDate = new Date(end);
+
+      const filtered = transactions.filter(t => {
+        const tDate = new Date(t.date);
+        return tDate >= startDate && tDate <= endDate;
+      });
+
+      const list = document.getElementById("filteredResults");
+      list.innerHTML = "";
+      let total = 0;
+
+      filtered.forEach(t => {
+        const li = document.createElement("li");
+        li.textContent = `${t.date} - ${t.type}: ${t.amount} TL - ${t.bank} - ${t.description}`;
+        list.appendChild(li);
+        total += t.type === "Gelir" ? t.amount : -t.amount;
+      });
+
+      document.getElementById("filteredProfit").textContent = total.toFixed(2);
     }
 
     updateUI();
