@@ -3,28 +3,48 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Gelir Gider Takip</title>
+<title>Gelir Gider Takip Sistemi</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   body { font-family: Arial, sans-serif; margin: 20px; }
   label { display: block; margin-top: 10px; }
-  select, input { padding: 5px; margin-top: 5px; width: 200px; }
-  button { margin-top: 15px; padding: 10px 20px; cursor: pointer; }
-  table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-  th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-  th { background: #eee; }
-  #totals { margin-top: 20px; font-weight: bold; }
+  input, select, button, textarea { padding: 8px; margin-top: 5px; width: 100%; max-width: 300px; }
+  button { cursor: pointer; background-color: #4CAF50; border: none; color: white; font-weight: bold; }
+  button:hover { background-color: #45a049; }
+  section { margin-bottom: 30px; max-width: 400px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { border: 1px solid #ddd; padding: 8px; }
+  th { background-color: #f2f2f2; }
+  .hidden { display: none; }
+  .message { margin-top: 10px; font-weight: bold; }
+  .edit-btn, .delete-btn { cursor: pointer; color: blue; margin-left: 5px; font-size: 0.9em; }
+  .edit-btn:hover, .delete-btn:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
 
 <h1>Gelir Gider Takip Sistemi</h1>
 
-<!-- Giriş/Kayıt kısmı burada olmalı ama buraya dahil etmedim, sadece giriş yapıldığı varsayımıyla devam -->
+<!-- Giriş / Kayıt -->
+<section id="authSection">
+  <h2>Kullanıcı Girişi / Kayıt</h2>
+  <input id="email" type="email" placeholder="Email" />
+  <input id="password" type="password" placeholder="Şifre" />
+  <button id="loginBtn">Giriş Yap</button>
+  <button id="registerBtn">Kayıt Ol</button>
+  <p id="authMessage" class="message"></p>
+</section>
 
-<section>
-  <h2>Gelir/Gider Ekle</h2>
-  <label>Tür:
+<!-- Ana uygulama bölümü -->
+<section id="appSection" class="hidden">
+
+  <button id="logoutBtn" style="background-color:#f44336; max-width:100px;">Çıkış Yap</button>
+
+  <h2>Gelir / Gider Ekle</h2>
+  <label>Tür (Gelir / Gider):
     <select id="typeSelect">
       <option value="">Seçiniz</option>
       <option value="gelir">Gelir</option>
@@ -32,18 +52,26 @@
     </select>
   </label>
   <label>Kategori:
-    <input type="text" id="categoryInput" placeholder="Kategori giriniz (manuel)" />
+    <input type="text" id="categoryInput" placeholder="Kategoriyi buraya yazın" />
+  </label>
+  <label>Alt Kategori (isteğe bağlı):
+    <input type="text" id="subCategoryInput" placeholder="Alt kategori (opsiyonel)" />
   </label>
   <label>Tutar:
-    <input type="number" id="amountInput" min="0" step="0.01" />
+    <input type="number" id="amountInput" min="0.01" step="0.01" placeholder="0.00" />
   </label>
   <label>Tarih:
     <input type="date" id="dateInput" />
   </label>
   <button id="addEntryBtn">Ekle</button>
-</section>
+  <p id="addMessage" class="message"></p>
 
-<section>
+  <h2>Kategoriler</h2>
+  <ul id="categoryList"></ul>
+  <input type="text" id="newCategoryInput" placeholder="Yeni kategori ekle" style="max-width: 250px; display:inline-block;" />
+  <button id="addCategoryBtn" style="max-width: 120px; display:inline-block;">Kategori Ekle</button>
+  <p id="categoryMessage" class="message"></p>
+
   <h2>Rapor Filtrele</h2>
   <label>Başlangıç Tarihi:
     <input type="date" id="startDateInput" />
@@ -53,16 +81,16 @@
   </label>
   <button id="filterBtn">Filtrele</button>
   <button id="exportPdfBtn">PDF İndir</button>
-</section>
 
-<section>
   <h2>Rapor</h2>
-  <table id="reportTable" style="display:none;">
+  <table id="reportTable" class="hidden">
     <thead>
       <tr>
         <th>Tür</th>
         <th>Kategori</th>
+        <th>Alt Kategori</th>
         <th>Tutar (₺)</th>
+        <th>İşlem</th>
       </tr>
     </thead>
     <tbody id="reportBody"></tbody>
@@ -71,167 +99,378 @@
 </section>
 
 <script>
-  const { jsPDF } = window.jspdf;
+  // Firebase config - kendi bilgilerini buraya koy
+  const firebaseConfig = {
+    apiKey: "AIzaSyCTZXqmpVQeYwm2PoDwEYih9vDDl3A5rtI",
+    authDomain: "gelir-gider-d3dc3.firebaseapp.com",
+    projectId: "gelir-gider-d3dc3",
+    storageBucket: "gelir-gider-d3dc3.appspot.com",
+    messagingSenderId: "791363419549",
+    appId: "1:791363419549:web:724a349a5efcd6b7c30374",
+    measurementId: "G-B8NKY7SR14"
+  };
 
-  let entries = [];
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
 
+  // Auth Elements
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const loginBtn = document.getElementById('loginBtn');
+  const registerBtn = document.getElementById('registerBtn');
+  const authMessage = document.getElementById('authMessage');
+
+  // App Elements
+  const authSection = document.getElementById('authSection');
+  const appSection = document.getElementById('appSection');
+
+  const logoutBtn = document.getElementById('logoutBtn');
   const typeSelect = document.getElementById('typeSelect');
   const categoryInput = document.getElementById('categoryInput');
+  const subCategoryInput = document.getElementById('subCategoryInput');
   const amountInput = document.getElementById('amountInput');
   const dateInput = document.getElementById('dateInput');
   const addEntryBtn = document.getElementById('addEntryBtn');
+  const addMessage = document.getElementById('addMessage');
+
+  const categoryList = document.getElementById('categoryList');
+  const newCategoryInput = document.getElementById('newCategoryInput');
+  const addCategoryBtn = document.getElementById('addCategoryBtn');
+  const categoryMessage = document.getElementById('categoryMessage');
 
   const startDateInput = document.getElementById('startDateInput');
   const endDateInput = document.getElementById('endDateInput');
   const filterBtn = document.getElementById('filterBtn');
+  const exportPdfBtn = document.getElementById('exportPdfBtn');
 
   const reportTable = document.getElementById('reportTable');
   const reportBody = document.getElementById('reportBody');
   const totalsDiv = document.getElementById('totals');
 
-  const exportPdfBtn = document.getElementById('exportPdfBtn');
+  // PDF kütüphanesi
+  const { jsPDF } = window.jspdf;
 
-  // Tarih varsayılan bugün
-  dateInput.value = new Date().toISOString().slice(0,10);
+  // Global değişkenler
+  let currentUser = null;
+  let categories = [];
+  let entries = [];
 
-  addEntryBtn.addEventListener('click', () => {
+  // Tarih input default değer bugün
+  dateInput.value = new Date().toISOString().slice(0, 10);
+
+  // --- AUTH ---
+
+  registerBtn.onclick = () => {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value.trim();
+
+    if(!email || !password) {
+      authMessage.textContent = "Email ve şifre gerekli!";
+      return;
+    }
+
+    auth.createUserWithEmailAndPassword(email, password)
+      .then(() => authMessage.textContent = "Kayıt başarılı! Giriş yapabilirsiniz.")
+      .catch(e => authMessage.textContent = "Hata: " + e.message);
+  };
+
+  loginBtn.onclick = () => {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value.trim();
+
+    if(!email || !password) {
+      authMessage.textContent = "Email ve şifre gerekli!";
+      return;
+    }
+
+    auth.signInWithEmailAndPassword(email, password)
+      .then(() => {
+        authMessage.textContent = "";
+      })
+      .catch(e => authMessage.textContent = "Hata: " + e.message);
+  };
+
+  logoutBtn.onclick = () => {
+    auth.signOut();
+  };
+
+  // Oturum değişimini dinle
+  auth.onAuthStateChanged(user => {
+    if(user) {
+      currentUser = user;
+      authSection.classList.add('hidden');
+      appSection.classList.remove('hidden');
+
+      loadData();
+    } else {
+      currentUser = null;
+      authSection.classList.remove('hidden');
+      appSection.classList.add('hidden');
+
+      clearAll();
+    }
+  });
+
+  // --- KATEGORİLER ---
+
+  function loadCategories(){
+    db.collection('users').doc(currentUser.uid).collection('categories').get()
+      .then(snapshot => {
+        categories = [];
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          categories.push({ id: doc.id, name: data.name });
+        });
+        renderCategories();
+      });
+  }
+
+  function renderCategories(){
+    categoryList.innerHTML = '';
+    categories.forEach(cat => {
+      const li = document.createElement('li');
+      li.textContent = cat.name;
+
+      // Düzenle ve Sil butonları
+      const editBtn = document.createElement('span');
+      editBtn.textContent = "Düzenle";
+      editBtn.className = "edit-btn";
+      editBtn.onclick = () => editCategory(cat.id, cat.name);
+
+      const deleteBtn = document.createElement('span');
+      deleteBtn.textContent = "Sil";
+      deleteBtn.className = "delete-btn";
+      deleteBtn.onclick = () => deleteCategory(cat.id);
+
+      li.appendChild(editBtn);
+      li.appendChild(deleteBtn);
+
+      categoryList.appendChild(li);
+    });
+  }
+
+  addCategoryBtn.onclick = () => {
+    const newCat = newCategoryInput.value.trim();
+    if(!newCat){
+      categoryMessage.textContent = "Kategori boş olamaz!";
+      return;
+    }
+    // Var mı kontrol et
+    if(categories.find(c=>c.name.toLowerCase() === newCat.toLowerCase())){
+      categoryMessage.textContent = "Kategori zaten var!";
+      return;
+    }
+
+    db.collection('users').doc(currentUser.uid).collection('categories').add({ name: newCat })
+      .then(() => {
+        categoryMessage.textContent = "Kategori eklendi.";
+        newCategoryInput.value = '';
+        loadCategories();
+      })
+      .catch(e => categoryMessage.textContent = "Hata: " + e.message);
+  };
+
+  function editCategory(id, oldName){
+    const newName = prompt("Kategori adını düzenleyin:", oldName);
+    if(newName && newName.trim() !== ""){
+      db.collection('users').doc(currentUser.uid).collection('categories').doc(id).update({ name: newName.trim() })
+      .then(() => {
+        categoryMessage.textContent = "Kategori güncellendi.";
+        loadCategories();
+      })
+      .catch(e => categoryMessage.textContent = "Hata: " + e.message);
+    }
+  }
+
+  function deleteCategory(id){
+    if(confirm("Bu kategoriyi silmek istediğinize emin misiniz? Bu kategoriye ait kayıtlar etkilenmez.")){
+      db.collection('users').doc(currentUser.uid).collection('categories').doc(id).delete()
+        .then(() => {
+          categoryMessage.textContent = "Kategori silindi.";
+          loadCategories();
+        })
+        .catch(e => categoryMessage.textContent = "Hata: " + e.message);
+    }
+  }
+
+  // --- GELİR / GİDER KAYITLARI ---
+
+  addEntryBtn.onclick = () => {
     const type = typeSelect.value;
     const category = categoryInput.value.trim();
+    const subCategory = subCategoryInput.value.trim();
     const amount = parseFloat(amountInput.value);
     const date = dateInput.value;
 
-    if(!type) return alert('Lütfen gelir veya gider seçin.');
-    if(!category) return alert('Kategori boş olamaz.');
-    if(!amount || amount <= 0) return alert('Geçerli tutar girin.');
-    if(!date) return alert('Tarih seçin.');
+    addMessage.textContent = "";
 
-    entries.push({ type, category, amount, date });
-
-    alert('Kayıt eklendi.');
-
-    // Temizle
-    categoryInput.value = '';
-    amountInput.value = '';
-    dateInput.value = new Date().toISOString().slice(0,10);
-
-    renderReport(entries);
-  });
-
-  filterBtn.addEventListener('click', () => {
-    const start = startDateInput.value;
-    const end = endDateInput.value;
-
-    const filtered = entries.filter(e => {
-      if(start && e.date < start) return false;
-      if(end && e.date > end) return false;
-      return true;
-    });
-
-    renderReport(filtered);
-  });
-
-  function renderReport(data) {
-    if(data.length === 0){
-      reportTable.style.display = 'none';
-      totalsDiv.textContent = 'Gösterilecek kayıt yok.';
+    if(!type){
+      addMessage.textContent = "Lütfen gelir ya da gider seçin.";
+      return;
+    }
+    if(!category){
+      addMessage.textContent = "Kategori boş olamaz.";
+      return;
+    }
+    if(isNaN(amount) || amount <= 0){
+      addMessage.textContent = "Geçerli bir tutar girin.";
+      return;
+    }
+    if(!date){
+      addMessage.textContent = "Tarih seçin.";
       return;
     }
 
-    reportTable.style.display = 'table';
-    reportBody.innerHTML = '';
+    // Girdiyi Firebase e ekle
+    db.collection('users').doc(currentUser.uid).collection('entries').add({
+      type,
+      category,
+      subCategory,
+      amount,
+      date,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    })
+    .then(() => {
+      addMessage.textContent = "Kayıt eklendi.";
+      typeSelect.value = "";
+      categoryInput.value = "";
+      subCategoryInput.value = "";
+      amountInput.value = "";
+      dateInput.value = new Date().toISOString().slice(0, 10);
+      loadData();
+    })
+    .catch(e => addMessage.textContent = "Hata: " + e.message);
+  };
 
-    // Tür+Kategori bazında topla
-    const aggregated = {};
-    data.forEach(e => {
-      const key = e.type + '|' + e.category;
-      if(!aggregated[key]) aggregated[key] = 0;
-      aggregated[key] += e.amount;
-    });
+  // --- VERİLERİ YÜKLEME & RAPOR ---
 
-    let totalIncome = 0;
-    let totalExpense = 0;
+  function loadData(){
+    loadCategories();
 
-    for(const key in aggregated){
-      const [type, category] = key.split('|');
-      const amount = aggregated[key];
-
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${type}</td><td>${category}</td><td>${amount.toFixed(2)}</td>`;
-      reportBody.appendChild(tr);
-
-      if(type === 'gelir') totalIncome += amount;
-      else totalExpense += amount;
-    }
-
-    totalsDiv.textContent = `Toplam Gelir: ${totalIncome.toFixed(2)} ₺, Toplam Gider: ${totalExpense.toFixed(2)} ₺, Net: ${(totalIncome - totalExpense).toFixed(2)} ₺`;
+    db.collection('users').doc(currentUser.uid).collection('entries').orderBy('date', 'desc').get()
+      .then(snapshot => {
+        entries = [];
+        snapshot.forEach(doc => {
+          const d = doc.data();
+          entries.push({
+            id: doc.id,
+            type: d.type,
+            category: d.category,
+            subCategory: d.subCategory,
+            amount: d.amount,
+            date: d.date
+          });
+        });
+        renderReport(entries);
+      });
   }
 
-  exportPdfBtn.addEventListener('click', () => {
-    if(entries.length === 0){
-      alert('PDF oluşturmak için kayıt yok.');
+  filterBtn.onclick = () => {
+    const startDate = startDateInput.value;
+    const endDate = endDateInput.value;
+
+    let filtered = [...entries];
+    if(startDate) filtered = filtered.filter(e => e.date >= startDate);
+    if(endDate) filtered = filtered.filter(e => e.date <= endDate);
+
+    renderReport(filtered);
+  };
+
+  function renderReport(list){
+    if(list.length === 0){
+      reportTable.classList.add('hidden');
+      totalsDiv.innerHTML = "<p>Gösterilecek veri yok.</p>";
       return;
     }
-    const start = startDateInput.value;
-    const end = endDateInput.value;
 
-    const filtered = entries.filter(e => {
-      if(start && e.date < start) return false;
-      if(end && e.date > end) return false;
-      return true;
+    // Aynı tür, kategori, alt kategoriye göre topla
+    const grouped = {};
+    list.forEach(item => {
+      const key = item.type + "|" + item.category.toLowerCase() + "|" + (item.subCategory || "").toLowerCase();
+      if(!grouped[key]){
+        grouped[key] = { type: item.type, category: item.category, subCategory: item.subCategory, amount: 0 };
+      }
+      grouped[key].amount += item.amount;
     });
 
-    if(filtered.length === 0){
-      alert('Seçilen tarihlerde kayıt bulunamadı.');
-      return;
-    }
-
-    const aggregated = {};
-    filtered.forEach(e => {
-      const key = e.type + '|' + e.category;
-      if(!aggregated[key]) aggregated[key] = 0;
-      aggregated[key] += e.amount;
-    });
+    // Tabloyu temizle
+    reportBody.innerHTML = '';
 
     let totalIncome = 0;
     let totalExpense = 0;
 
+    Object.values(grouped).forEach(g => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${g.type === 'gelir' ? 'Gelir' : 'Gider'}</td>
+        <td>${g.category}</td>
+        <td>${g.subCategory || '-'}</td>
+        <td>${g.amount.toFixed(2)}</td>
+        <td></td>
+      `;
+      reportBody.appendChild(tr);
+
+      if(g.type === 'gelir') totalIncome += g.amount;
+      else if(g.type === 'gider') totalExpense += g.amount;
+    });
+
+    totalsDiv.innerHTML = `<h3>Toplam Gelir: ₺${totalIncome.toFixed(2)} | Toplam Gider: ₺${totalExpense.toFixed(2)} | Net Kar/Zarar: ₺${(totalIncome - totalExpense).toFixed(2)}</h3>`;
+
+    reportTable.classList.remove('hidden');
+  }
+
+  // PDF İndir
+  exportPdfBtn.onclick = () => {
     const doc = new jsPDF();
 
     doc.setFontSize(18);
     doc.text("Gelir Gider Raporu", 14, 22);
 
+    let y = 30;
     doc.setFontSize(12);
-    doc.text(`Tarih Aralığı: ${start || 'Başlangıç'} - ${end || 'Bitiş'}`, 14, 30);
 
-    // Tablo başlığı
-    doc.text("Tür     Kategori     Tutar (₺)", 14, 40);
+    if(reportBody.children.length === 0){
+      doc.text("Gösterilecek veri yok.", 14, y);
+    } else {
+      doc.text("Tür | Kategori | Alt Kategori | Tutar (₺)", 14, y);
+      y += 8;
 
-    let y = 50;
-    for(const key in aggregated){
-      const [type, category] = key.split('|');
-      const amount = aggregated[key];
+      for(let row of reportBody.children){
+        const cells = row.children;
+        const line = `${cells[0].textContent} | ${cells[1].textContent} | ${cells[2].textContent} | ${cells[3].textContent}`;
+        doc.text(line, 14, y);
+        y += 8;
+        if(y > 280){
+          doc.addPage();
+          y = 20;
+        }
+      }
 
-      doc.text(`${type}     ${category}     ${amount.toFixed(2)}`, 14, y);
+      // Toplamlar
       y += 10;
-
-      if(type === 'gelir') totalIncome += amount;
-      else totalExpense += amount;
+      doc.setFontSize(14);
+      doc.text(totalsDiv.textContent, 14, y);
     }
 
-    y += 10;
-    doc.text(`Toplam Gelir: ${totalIncome.toFixed(2)} ₺`, 14, y);
-    y += 10;
-    doc.text(`Toplam Gider: ${totalExpense.toFixed(2)} ₺`, 14, y);
-    y += 10;
-    doc.text(`Net Kar/Zarar: ${(totalIncome - totalExpense).toFixed(2)} ₺`, 14, y);
+    doc.save("gelir-gider-raporu.pdf");
+  };
 
-    doc.save(`GelirGiderRapor_${start || 'baslangic'}_${end || 'bitis'}.pdf`);
-  });
-
-  // İlk açılışta raporu boş göster
-  renderReport(entries);
-
+  // Temizle
+  function clearAll(){
+    categoryList.innerHTML = '';
+    reportBody.innerHTML = '';
+    totalsDiv.innerHTML = '';
+    addMessage.textContent = '';
+    categoryMessage.textContent = '';
+    typeSelect.value = "";
+    categoryInput.value = "";
+    subCategoryInput.value = "";
+    amountInput.value = "";
+    startDateInput.value = "";
+    endDateInput.value = "";
+    reportTable.classList.add('hidden');
+  }
 </script>
-
 </body>
 </html>
