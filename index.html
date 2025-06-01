@@ -11,6 +11,8 @@
     .section { margin-bottom: 25px; border: 1px solid #ccc; padding: 15px; border-radius: 8px; }
     #transactionList { width: 100%; height: 150px; }
     #filteredResults { max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 8px; }
+    #subcategory-wrapper { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+    #newSubcategory { flex-grow: 1; }
   </style>
 </head>
 <body>
@@ -25,10 +27,13 @@
       </select>
 
       <label for="subcategory">Alt Kategori:</label>
-      <select id="subcategory" required>
-        <!-- Başlangıçta boş, kullanıcı manuel ekleyecek -->
-      </select>
-      <input type="text" id="newSubcategory" placeholder="Yeni alt kategori ekle ve Enter'a bas" style="margin-top: 5px;"/>
+      <div id="subcategory-wrapper">
+        <select id="subcategory" required style="flex-grow:1;">
+          <!-- Başlangıçta boş, kullanıcı manuel ekleyecek -->
+        </select>
+        <input type="text" id="newSubcategory" placeholder="Yeni alt kategori" />
+        <button type="button" id="addSubcategoryBtn">Alt Kategori Ekle</button>
+      </div>
 
       <label for="amount">Tutar (TL):</label>
       <input type="number" id="amount" step="0.01" min="0" required />
@@ -77,7 +82,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <script>
-    // Alt kategoriler tür bazlı, başlangıçta boş
     let incomeCategories = [];
     let expenseCategories = [];
 
@@ -87,10 +91,17 @@
     const typeSelect = document.getElementById("type");
     const subcategorySelect = document.getElementById("subcategory");
     const newSubcategoryInput = document.getElementById("newSubcategory");
+    const addSubcategoryBtn = document.getElementById("addSubcategoryBtn");
     const transactionList = document.getElementById("transactionList");
     const filteredResults = document.getElementById("filteredResults");
 
-    // Alt kategori yükle (seçilen türe göre)
+    // LocalStorage'dan alt kategorileri yükle
+    function loadCategoriesFromStorage() {
+      incomeCategories = JSON.parse(localStorage.getItem("incomeCategories")) || [];
+      expenseCategories = JSON.parse(localStorage.getItem("expenseCategories")) || [];
+    }
+
+    // Alt kategori dropdown'u güncelle
     function loadSubcategories() {
       subcategorySelect.innerHTML = "";
       const list = typeSelect.value === "Gelir" ? incomeCategories : expenseCategories;
@@ -98,7 +109,7 @@
       if (list.length === 0) {
         const opt = document.createElement("option");
         opt.value = "";
-        opt.textContent = "-- Kategori yok, lütfen yeni ekleyin --";
+        opt.textContent = "-- Kategori yok, lütfen ekleyin --";
         opt.disabled = true;
         opt.selected = true;
         subcategorySelect.appendChild(opt);
@@ -112,51 +123,39 @@
       }
     }
 
-    // Sayfa açılır açılmaz alt kategorileri yükle
-    loadSubcategories();
-
-    // Tür değişince alt kategoriyi yenile
-    typeSelect.addEventListener("change", () => {
-      loadSubcategories();
-      newSubcategoryInput.value = "";
-    });
-
-    // Yeni alt kategori ekleme (Enter'a basınca)
-    newSubcategoryInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        const val = newSubcategoryInput.value.trim();
-        if (!val) return alert("Alt kategori boş olamaz!");
-
-        let list = typeSelect.value === "Gelir" ? incomeCategories : expenseCategories;
-
-        if (list.find(cat => cat.toLowerCase() === val.toLowerCase())) {
-          alert("Bu alt kategori zaten var!");
-          return;
-        }
-
-        list.push(val);
-        loadSubcategories();
-
-        subcategorySelect.value = val;
-        newSubcategoryInput.value = "";
-
-        // Alt kategorileri localStorage'da sakla
-        saveCategories();
-      }
-    });
-
-    // Alt kategorileri localStorage'da tut
+    // Alt kategorileri localStorage'a kaydet
     function saveCategories() {
       localStorage.setItem("incomeCategories", JSON.stringify(incomeCategories));
       localStorage.setItem("expenseCategories", JSON.stringify(expenseCategories));
     }
 
-    // LocalStorage'dan alt kategorileri yükle
-    function loadCategoriesFromStorage() {
-      incomeCategories = JSON.parse(localStorage.getItem("incomeCategories")) || [];
-      expenseCategories = JSON.parse(localStorage.getItem("expenseCategories")) || [];
-    }
+    // Yeni alt kategori ekleme buton tıklaması
+    addSubcategoryBtn.addEventListener("click", () => {
+      const val = newSubcategoryInput.value.trim();
+      if (!val) return alert("Lütfen eklemek istediğiniz alt kategori adını girin!");
+
+      let list = typeSelect.value === "Gelir" ? incomeCategories : expenseCategories;
+
+      if (list.find(cat => cat.toLowerCase() === val.toLowerCase())) {
+        alert("Bu alt kategori zaten var!");
+        return;
+      }
+
+      list.push(val);
+      saveCategories();
+      loadSubcategories();
+
+      // Yeni eklenen kategori seçili olsun
+      subcategorySelect.value = val;
+
+      newSubcategoryInput.value = "";
+    });
+
+    // Tür değişince alt kategorileri yenile
+    typeSelect.addEventListener("change", () => {
+      loadSubcategories();
+      newSubcategoryInput.value = "";
+    });
 
     // İşlem listesini güncelle
     function updateUI() {
@@ -180,7 +179,7 @@
       document.getElementById("totalProfit").textContent = (totalIncome - totalExpense).toFixed(2);
     }
 
-    // Yeni işlem ekleme
+    // Form submit (Ekle/Düzenle)
     document.getElementById("transactionForm").addEventListener("submit", function(e) {
       e.preventDefault();
 
@@ -295,4 +294,50 @@
       }
 
       document.getElementById("filteredIncome").textContent = totalIncome.toFixed(2);
-      document.getElementById("filteredExpense").textContent
+      document.getElementById("filteredExpense").textContent = totalExpense.toFixed(2);
+      document.getElementById("filteredProfit").textContent = (totalIncome - totalExpense).toFixed(2);
+    }
+
+    // PDF dışa aktarma
+    async function exportPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      doc.setFontSize(18);
+      doc.text("Gelir/Gider Raporu", 14, 20);
+
+      const start = document.getElementById("startDate").value || "Başlangıç yok";
+      const end = document.getElementById("endDate").value || "Bitiş yok";
+      doc.setFontSize(12);
+      doc.text(`Tarih Aralığı: ${start} - ${end}`, 14, 30);
+
+      doc.text(`Toplam Gelir: ${document.getElementById("filteredIncome").textContent} TL`, 14, 40);
+      doc.text(`Toplam Gider: ${document.getElementById("filteredExpense").textContent} TL`, 14, 50);
+      doc.text(`Toplam Kar/Zarar: ${document.getElementById("filteredProfit").textContent} TL`, 14, 60);
+
+      let y = 75;
+      doc.setFontSize(14);
+      doc.text("Detaylar:", 14, y);
+      y += 8;
+      doc.setFontSize(12);
+
+      const lines = Array.from(filteredResults.querySelectorAll("li")).map(li => li.textContent);
+      lines.forEach(line => {
+        if (y > 280) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.text(line, 14, y);
+        y += 7;
+      });
+
+      doc.save("gelir-gider-raporu.pdf");
+    }
+
+    // Sayfa yüklendiğinde alt kategorileri ve işlemleri yükle
+    window.onload = () => {
+      loadCategoriesFromStorage();
+      loadSubcategories();
+      updateUI();
+    };
+  </
