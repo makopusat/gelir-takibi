@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
-  <title>Gelir/Gider Takip Sistemi</title>
+  <title>Gelir/Gider Takip Sistemi - Dinamik Alt Kategori</title>
   <style>
     body { font-family: Arial; margin: 20px; }
     label, select, input, button { margin: 5px 0; display: block; }
@@ -24,8 +24,9 @@
         <option value="Gider">Gider</option>
       </select>
 
-      <label for="subcategory">Alt Kategori:</label>
-      <select id="subcategory" required></select>
+      <label for="subcategoryInput">Alt Kategori (yeni ekleyebilir veya seçebilirsin):</label>
+      <input list="subcategoryList" id="subcategoryInput" name="subcategoryInput" placeholder="Alt kategori gir veya seç" autocomplete="off" required />
+      <datalist id="subcategoryList"></datalist>
 
       <label for="amount">Tutar:</label>
       <input type="number" id="amount" required min="0" step="0.01" />
@@ -68,13 +69,19 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <script>
-    const gelirAltKategoriler = [
+    // LocalStorage key'leri
+    const LS_TRANSACTIONS = "transactions";
+    const LS_INCOME_CATEGORIES = "incomeCategories";
+    const LS_EXPENSE_CATEGORIES = "expenseCategories";
+
+    // Varsayılan alt kategoriler
+    const defaultIncomeCategories = [
       "Maaş",
       "Bonus",
       "Yatırım Getirisi",
       "Diğer Gelir"
     ];
-    const giderAltKategoriler = [
+    const defaultExpenseCategories = [
       "Kira",
       "Elektrik",
       "Su",
@@ -83,33 +90,54 @@
     ];
 
     const typeSelect = document.getElementById("type");
-    const subcategorySelect = document.getElementById("subcategory");
+    const subcategoryInput = document.getElementById("subcategoryInput");
+    const subcategoryList = document.getElementById("subcategoryList");
     const transactionList = document.getElementById("transactionList");
     const filteredResults = document.getElementById("filteredResults");
+    const addBtn = document.getElementById("addBtn");
+    const editBtn = document.getElementById("editBtn");
 
-    let transactions = JSON.parse(localStorage.getItem("transactions")) || [];
+    let transactions = JSON.parse(localStorage.getItem(LS_TRANSACTIONS)) || [];
+    let incomeCategories = JSON.parse(localStorage.getItem(LS_INCOME_CATEGORIES)) || defaultIncomeCategories;
+    let expenseCategories = JSON.parse(localStorage.getItem(LS_EXPENSE_CATEGORIES)) || defaultExpenseCategories;
+
     let selectedIndex = null;
 
-    function updateSubcategories() {
-      const type = typeSelect.value;
-      let options = [];
+    // Alt kategori listesine datalist doldur
+    function updateSubcategoryList() {
+      let categories = typeSelect.value === "Gelir" ? incomeCategories : expenseCategories;
 
-      if (type === "Gelir") {
-        options = gelirAltKategoriler;
-      } else {
-        options = giderAltKategoriler;
-      }
+      // Datalist'ı temizle
+      subcategoryList.innerHTML = "";
 
-      subcategorySelect.innerHTML = "";
-      options.forEach(opt => {
-        const optionElement = document.createElement("option");
-        optionElement.value = opt;
-        optionElement.text = opt;
-        subcategorySelect.appendChild(optionElement);
+      categories.forEach(cat => {
+        const option = document.createElement("option");
+        option.value = cat;
+        subcategoryList.appendChild(option);
       });
     }
 
-    // Tüm işlemleri listeye ve toplam hesaplamaya yansıt
+    // Yeni alt kategori ekle (eğer yoksa)
+    function addSubcategoryIfNotExists(type, subcategory) {
+      if (!subcategory) return;
+      let list = type === "Gelir" ? incomeCategories : expenseCategories;
+
+      // Küçük-büyük harf duyarlılığı olmadan kontrol
+      const exists = list.some(cat => cat.toLowerCase() === subcategory.toLowerCase());
+      if (!exists) {
+        list.push(subcategory);
+        if (type === "Gelir") {
+          incomeCategories = list;
+          localStorage.setItem(LS_INCOME_CATEGORIES, JSON.stringify(incomeCategories));
+        } else {
+          expenseCategories = list;
+          localStorage.setItem(LS_EXPENSE_CATEGORIES, JSON.stringify(expenseCategories));
+        }
+        updateSubcategoryList();
+      }
+    }
+
+    // Listeyi güncelle
     function updateUI() {
       transactionList.innerHTML = "";
       let totalIncome = 0;
@@ -130,33 +158,48 @@
       document.getElementById("totalProfit").textContent = (totalIncome - totalExpense).toFixed(2);
     }
 
-    // Yeni işlem ekle veya düzenle
+    // Form gönderildiğinde
     document.getElementById("transactionForm").addEventListener("submit", function(e) {
       e.preventDefault();
 
-      const newTransaction = {
-        type: typeSelect.value,
-        subcategory: subcategorySelect.value,
-        amount: parseFloat(document.getElementById("amount").value),
-        date: document.getElementById("date").value
-      };
+      const type = typeSelect.value;
+      const subcategory = subcategoryInput.value.trim();
+      const amount = parseFloat(document.getElementById("amount").value);
+      const date = document.getElementById("date").value;
+
+      if (!subcategory) {
+        alert("Lütfen alt kategori girin.");
+        return;
+      }
+
+      // Yeni alt kategori ekle
+      addSubcategoryIfNotExists(type, subcategory);
+
+      const newTransaction = { type, subcategory, amount, date };
 
       if (selectedIndex === null) {
         transactions.push(newTransaction);
       } else {
         transactions[selectedIndex] = newTransaction;
         selectedIndex = null;
-        document.getElementById("addBtn").style.display = "inline-block";
-        document.getElementById("editBtn").style.display = "none";
+        addBtn.style.display = "inline-block";
+        editBtn.style.display = "none";
       }
 
-      localStorage.setItem("transactions", JSON.stringify(transactions));
+      localStorage.setItem(LS_TRANSACTIONS, JSON.stringify(transactions));
+
       this.reset();
-      updateSubcategories();
+      updateSubcategoryList();
       updateUI();
     });
 
-    // Düzenleme butonu
+    // Tür değiştiğinde alt kategori listesi güncelle
+    typeSelect.addEventListener("change", () => {
+      updateSubcategoryList();
+      subcategoryInput.value = "";
+    });
+
+    // Düzenleme
     function editSelected() {
       const selected = transactionList.selectedIndex;
       if (selected === -1) {
@@ -168,21 +211,20 @@
       const t = transactions[selectedIndex];
 
       typeSelect.value = t.type;
-      updateSubcategories();
-      subcategorySelect.value = t.subcategory;
+      updateSubcategoryList();
+      subcategoryInput.value = t.subcategory;
       document.getElementById("amount").value = t.amount;
       document.getElementById("date").value = t.date;
 
-      document.getElementById("addBtn").style.display = "none";
-      document.getElementById("editBtn").style.display = "inline-block";
+      addBtn.style.display = "none";
+      editBtn.style.display = "inline-block";
     }
 
-    // Kaydet butonu (düzenleme sonrası)
-    document.getElementById("editBtn").addEventListener("click", () => {
-      document.getElementById("transactionForm").dispatchEvent(new Event('submit'));
+    editBtn.addEventListener("click", () => {
+      document.getElementById("transactionForm").dispatchEvent(new Event("submit"));
     });
 
-    // Silme fonksiyonu
+    // Silme
     function deleteSelected() {
       const selected = transactionList.selectedIndex;
       if (selected === -1) {
@@ -192,11 +234,11 @@
       if (!confirm("Seçilen işlemi silmek istediğinize emin misiniz?")) return;
 
       transactions.splice(selected, 1);
-      localStorage.setItem("transactions", JSON.stringify(transactions));
+      localStorage.setItem(LS_TRANSACTIONS, JSON.stringify(transactions));
       updateUI();
     }
 
-    // Raporlama: Aynı alt kategori için toplamları birleştir ve filtre uygula
+    // Raporlama (aynı alt kategori toplu gösterim)
     function filterByDate() {
       const start = document.getElementById("startDate").value;
       const end = document.getElementById("endDate").value;
@@ -214,12 +256,10 @@
         return tDate >= startDate && tDate <= endDate;
       });
 
-      // Alt kategori bazında gelir/gider toplamlarını hesapla
       let grouped = {};
 
       filtered.forEach(t => {
-        // Anahtar: tür + alt kategori
-        const key = t.type + "||" + t.subcategory;
+        const key = t.type + "||" + t.subcategory.toLowerCase();
         if (!grouped[key]) {
           grouped[key] = {
             type: t.type,
@@ -234,7 +274,6 @@
       let totalIncome = 0;
       let totalExpense = 0;
 
-      // Grupları listeye yaz
       for (const key in grouped) {
         const item = grouped[key];
         const li = document.createElement("li");
@@ -250,7 +289,7 @@
       document.getElementById("filteredProfit").textContent = (totalIncome - totalExpense).toFixed(2);
     }
 
-    // PDF dışa aktarma (filtrelenmiş raporu)
+    // PDF dışa aktarma
     async function exportPDF() {
       if (!window.jspdf) {
         alert("PDF oluşturucu yüklenemedi!");
@@ -269,7 +308,6 @@
 
       let y = 40;
 
-      // Rapordaki listeyi al
       const items = filteredResults.querySelectorAll("li");
       if (items.length === 0) {
         doc.text("Rapor listesi boş. Lütfen önce raporla butonuna tıklayın.", 14, y);
@@ -294,9 +332,9 @@
       doc.save("GelirGiderRaporu.pdf");
     }
 
-    // Başlangıçta alt kategorileri ve listeyi doldur
+    // Sayfa yüklendiğinde
     window.addEventListener("load", () => {
-      updateSubcategories();
+      updateSubcategoryList();
       updateUI();
     });
   </script>
